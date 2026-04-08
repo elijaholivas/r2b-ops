@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `adminAlerts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`alertType` varchar(100) NOT NULL,\n\t`title` varchar(255) NOT NULL,\n\t`message` text NOT NULL,\n\t`metadata` json,\n\t`isRead` boolean NOT NULL DEFAULT false,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `adminAlerts_id` PRIMARY KEY(`id`)\n);\n\nCREATE TABLE `classStaff` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`classId` int NOT NULL,\n\t`userId` int NOT NULL,\n\t`roleOnClass` varchar(50) DEFAULT 'instructor',\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `classStaff_id` PRIMARY KEY(`id`)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2qZ1d2ho4rYKYe1.21ab2fbe9781 --database 94KLU95dXj2TnxxpFKwJoW --execute CREATE TABLE `adminAlerts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`alertType` varchar(100) NOT NULL,\n\t`title` varchar(255) NOT NULL,\n\t`message` text NOT NULL,\n\t`metadata` json,\n\t`isRead` boolean NOT NULL DEFAULT false,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `adminAlerts_id` PRIMARY KEY(`id`)\n);\n\nCREATE TABLE `classStaff` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`classId` int NOT NULL,\n\t`userId` int NOT NULL,\n\t`roleOnClass` varchar(50) DEFAULT 'instructor',\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `classStaff_id` PRIMARY KEY(`id`)\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 201
+}

@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `activityLog` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`actorUserId` int,\n\t`actionType` varchar(100) NOT NULL,\n\t`entityType` varchar(50) NOT NULL,\n\t`entityId` int,\n\t`oldValues` json,\n\t`newValues` json,\n\t`notes` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `activityLog_id` PRIMARY KEY(`id`)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2qZ1d2ho4rYKYe1.21ab2fbe9781 --database 94KLU95dXj2TnxxpFKwJoW --execute CREATE TABLE `activityLog` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`actorUserId` int,\n\t`actionType` varchar(100) NOT NULL,\n\t`entityType` varchar(50) NOT NULL,\n\t`entityId` int,\n\t`oldValues` json,\n\t`newValues` json,\n\t`notes` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `activityLog_id` PRIMARY KEY(`id`)\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 198
+}

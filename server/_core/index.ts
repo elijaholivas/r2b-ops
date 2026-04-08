@@ -35,6 +35,41 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+
+  // Raw WooCommerce webhook endpoint — must be registered BEFORE express.json() parses the body
+  // so we can access the raw bytes for HMAC-SHA256 signature validation
+  app.post("/api/webhooks/woocommerce", express.raw({ type: "application/json" }), async (req, res) => {
+    try {
+      const rawBody = req.body as Buffer;
+      const signature = req.headers["x-wc-webhook-signature"] as string | undefined;
+      const webhookSecret = process.env.WOO_WEBHOOK_SECRET;
+
+      // Validate HMAC-SHA256 signature when a secret is configured
+      if (webhookSecret && signature) {
+        const { createHmac } = await import("crypto");
+        const expected = createHmac("sha256", webhookSecret)
+          .update(rawBody)
+          .digest("base64");
+        if (expected !== signature) {
+          console.warn("[Webhook] Invalid signature — request rejected");
+          res.status(401).json({ error: "Invalid signature" });
+          return;
+        }
+      }
+
+      const payload = JSON.parse(rawBody.toString("utf8"));
+      const event = req.headers["x-wc-webhook-topic"] as string ?? "order.created";
+
+      // Delegate to the tRPC webhook handler
+      const caller = appRouter.createCaller({ user: null, req, res } as any);
+      const result = await caller.webhooks.woocommerce({ event, payload, signature });
+      res.json(result);
+    } catch (err: any) {
+      console.error("[Webhook] Processing error:", err.message);
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -61,5 +96,23 @@ async function startServer() {
     console.log(`Server running on http://localhost:${port}/`);
   });
 }
+
+
+// ─── Email Scheduler ────────────────────────────────────────────────────────
+// Runs every 15 minutes: processes pending email queue and queues 2-day reminders
+async function runEmailScheduler() {
+  try {
+    const { processEmailQueue, scheduleReminderEmails } = await import("../emailScheduler");
+    await processEmailQueue();
+    await scheduleReminderEmails();
+  } catch (err: any) {
+    console.error("[EmailScheduler] Error:", err.message);
+  }
+}
+// Start scheduler 5 seconds after boot (gives DB time to connect), then every 15 min
+setTimeout(() => {
+  runEmailScheduler();
+  setInterval(runEmailScheduler, 15 * 60 * 1000);
+}, 5000);
 
 startServer().catch(console.error);
