@@ -89,6 +89,14 @@
 - [x] Vitest: admin.alerts (FORBIDDEN for non-admin, returns for admin)
 - [x] Vitest: admin.emailQueue (returns queue)
 
+## Settings Page (in-app credential management)
+- [x] Settings tab in Admin panel: Mailgun API key, domain, sender name fields
+- [x] Settings tab: WooCommerce site URL, consumer key, consumer secret, webhook secret fields
+- [x] Save/update settings via tRPC mutation (stored in integrationSettings table)
+- [x] Wire email sender to read Mailgun key from DB settings (fall back to env var)
+- [x] Wire webhook validator to read WOO_WEBHOOK_SECRET from DB settings
+- [x] Test connection buttons for Mailgun and WooCommerce in Settings tab
+
 ## Pending (requires external credentials)
 - [ ] MAILGUN_API_KEY — needed to send live emails
 - [ ] WOO_CONSUMER_KEY + WOO_CONSUMER_SECRET — WooCommerce REST API keys

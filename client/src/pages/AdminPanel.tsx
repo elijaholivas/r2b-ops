@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { SettingsTab } from "@/components/SettingsTab";
 
 const EMAIL_STATUS_COLORS: Record<string, string> = {
   pending: "bg-blue-900/40 text-blue-300 border-blue-700/50",
@@ -144,6 +145,10 @@ export default function AdminPanel() {
           <TabsTrigger value="woo" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Link2 className="h-4 w-4 mr-1.5" />
             WooCommerce
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Settings className="h-4 w-4 mr-1.5" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
@@ -334,6 +339,11 @@ export default function AdminPanel() {
               </table>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings" className="mt-4">
+          <SettingsTab />
         </TabsContent>
       </Tabs>
     </div>

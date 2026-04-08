@@ -42,7 +42,10 @@ async function startServer() {
     try {
       const rawBody = req.body as Buffer;
       const signature = req.headers["x-wc-webhook-signature"] as string | undefined;
-      const webhookSecret = process.env.WOO_WEBHOOK_SECRET;
+      // Read webhook secret from DB settings first, fall back to env var
+      const { getIntegrationSettings } = await import("../db");
+      const integrationSettings = await getIntegrationSettings();
+      const webhookSecret = integrationSettings?.webhookSecret || process.env.WOO_WEBHOOK_SECRET;
 
       // Validate HMAC-SHA256 signature when a secret is configured
       if (webhookSecret && signature) {
@@ -102,7 +105,7 @@ async function startServer() {
 // Runs every 15 minutes: processes pending email queue and queues 2-day reminders
 async function runEmailScheduler() {
   try {
-    const { processEmailQueue, scheduleReminderEmails } = await import("../emailScheduler");
+    const { processEmailQueue, scheduleReminderEmails } = await import("../emailScheduler.js");
     await processEmailQueue();
     await scheduleReminderEmails();
   } catch (err: any) {
