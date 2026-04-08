@@ -218,6 +218,53 @@ const classesRouter = router({
     }),
 
   locations: protectedProcedure.query(() => listLocations()),
+  duplicate: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      newStartDatetime: z.string(),
+      newEndDatetime: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      const cls = await getClassById(input.id);
+      if (!cls) throw new TRPCError({ code: "NOT_FOUND", message: "Class not found" });
+      const newId = await createClass({
+        title: cls.title,
+        classType: cls.classType ?? undefined,
+        description: cls.description ?? undefined,
+        locationId: cls.locationId ?? undefined,
+        instructorId: cls.instructorId ?? undefined,
+        startDatetime: new Date(input.newStartDatetime),
+        endDatetime: new Date(input.newEndDatetime),
+        capacity: cls.capacity,
+        price: cls.price ?? undefined,
+        wooProductId: cls.wooProductId ?? undefined,
+        status: "upcoming",
+        isActive: true,
+      } as any);
+      await logActivity({
+        actorUserId: ctx.user.id,
+        actionType: "class_created",
+        entityType: "class",
+        entityId: newId,
+        notes: `Class "${cls.title}" duplicated from class #${cls.id}`,
+      });
+      return { id: newId };
+    }),
+  archive: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      await updateClass(input.id, { isActive: false } as any);
+      await logActivity({
+        actorUserId: ctx.user.id,
+        actionType: "class_updated",
+        entityType: "class",
+        entityId: input.id,
+        notes: "Class archived",
+      });
+      return { success: true };
+    }),
 });
 
 // ─── Enrollments Router ───────────────────────────────────────────────────────

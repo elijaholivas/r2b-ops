@@ -12,6 +12,9 @@ import {
   Filter,
   Clock,
   ChevronRight,
+  MoreHorizontal,
+  Copy,
+  Archive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,8 +22,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import CreateClassModal from "@/components/CreateClassModal";
+import DuplicateClassModal from "@/components/DuplicateClassModal";
 
 function CapacityBar({ enrolled, capacity }: { enrolled: number; capacity: number }) {
   const pct = capacity > 0 ? Math.round((enrolled / capacity) * 100) : 0;
@@ -57,9 +63,18 @@ export default function Classes() {
   const isAdmin = user?.role === "super_admin" || user?.role === "admin";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [capacityFilter, setCapacityFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
 
   const { data: classes, isLoading, refetch } = trpc.classes.list.useQuery({});
+  const { data: locationsList } = trpc.classes.locations.useQuery();
+
+  const archiveClass = trpc.classes.archive.useMutation({
+    onSuccess: () => { toast.success("Class archived"); refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
 
   const filtered = (classes ?? []).filter((cls) => {
     const matchSearch =
@@ -68,8 +83,16 @@ export default function Classes() {
       cls.location?.name?.toLowerCase().includes(search.toLowerCase()) ||
       cls.classType?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || cls.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchLocation = locationFilter === "all" || String(cls.locationId) === locationFilter;
+    const isFull = cls.enrolledCount >= cls.capacity;
+    const matchCapacity =
+      capacityFilter === "all" ||
+      (capacityFilter === "available" && !isFull) ||
+      (capacityFilter === "full" && isFull);
+    return matchSearch && matchStatus && matchLocation && matchCapacity;
   });
+
+  const hasFilters = search || statusFilter !== "all" || locationFilter !== "all" || capacityFilter !== "all";
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-4xl mx-auto">
@@ -116,6 +139,31 @@ export default function Classes() {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        {locationsList && locationsList.length > 0 && (
+          <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <SelectTrigger className="w-44 bg-input border-border text-foreground">
+              <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Locations</SelectItem>
+              {locationsList.map((loc) => (
+                <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select value={capacityFilter} onValueChange={setCapacityFilter}>
+          <SelectTrigger className="w-36 bg-input border-border text-foreground">
+            <Users className="h-4 w-4 mr-1.5 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border">
+            <SelectItem value="all">All Capacity</SelectItem>
+            <SelectItem value="available">Has Open Seats</SelectItem>
+            <SelectItem value="full">Full</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Class List */}
@@ -130,7 +178,7 @@ export default function Classes() {
           <CardContent className="p-10 text-center">
             <CalendarDays className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">
-              {search || statusFilter !== "all" ? "No classes match your filters" : "No classes found"}
+              {hasFilters ? "No classes match your filters" : "No classes found"}
             </p>
           </CardContent>
         </Card>
@@ -139,49 +187,97 @@ export default function Classes() {
           {filtered.map((cls) => {
             const isFull = cls.enrolledCount >= cls.capacity;
             return (
-              <Link key={cls.id} href={`/classes/${cls.id}`}>
-                <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <h3 className="font-semibold text-foreground text-sm leading-tight">
-                            {cls.title}
-                          </h3>
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs", STATUS_COLORS[cls.status] ?? "bg-secondary text-muted-foreground")}
-                          >
-                            {STATUS_LABELS[cls.status] ?? cls.status}
-                          </Badge>
-                          {cls.classType && (
-                            <Badge variant="outline" className="text-xs bg-secondary text-muted-foreground border-border">
-                              {cls.classType}
+              <div key={cls.id} className="relative">
+                <Link href={`/classes/${cls.id}`}>
+                  <Card className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h3 className="font-semibold text-foreground text-sm leading-tight">
+                              {cls.title}
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className={cn("text-xs", STATUS_COLORS[cls.status] ?? "bg-secondary text-muted-foreground")}
+                            >
+                              {STATUS_LABELS[cls.status] ?? cls.status}
                             </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {format(new Date(cls.startDatetime), "EEE, MMM d · h:mm a")}
-                          </span>
-                          {cls.location && (
+                            {cls.classType && (
+                              <Badge variant="outline" className="text-xs bg-secondary text-muted-foreground border-border">
+                                {cls.classType}
+                              </Badge>
+                            )}
+                            {isFull && (
+                              <Badge variant="outline" className="text-xs bg-red-900/40 text-red-300 border-red-700/50">
+                                Full
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {cls.location.name}
+                              <Clock className="h-3 w-3" />
+                              {format(new Date(cls.startDatetime), "EEE, MMM d · h:mm a")}
                             </span>
+                            {cls.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {cls.location.name}
+                              </span>
+                            )}
+                            {cls.price && (
+                              <span className="text-green-400 font-medium">${cls.price}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-popover border-border">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDuplicatingId(cls.id);
+                                  }}
+                                  className="text-foreground hover:bg-secondary cursor-pointer"
+                                >
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Duplicate Class
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (confirm(`Archive "${cls.title}"? It will be hidden from all views.`)) {
+                                      archiveClass.mutate({ id: cls.id });
+                                    }
+                                  }}
+                                  className="text-red-400 hover:bg-secondary cursor-pointer"
+                                >
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archive
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
-                          {cls.price && (
-                            <span className="text-green-400 font-medium">${cls.price}</span>
-                          )}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-1" />
-                    </div>
-                    <CapacityBar enrolled={cls.enrolledCount} capacity={cls.capacity} />
-                  </CardContent>
-                </Card>
-              </Link>
+                      <CapacityBar enrolled={cls.enrolledCount} capacity={cls.capacity} />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
             );
           })}
         </div>
@@ -192,6 +288,14 @@ export default function Classes() {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           onSuccess={() => { setShowCreate(false); refetch(); }}
+        />
+      )}
+      {duplicatingId !== null && (
+        <DuplicateClassModal
+          classId={duplicatingId}
+          open={duplicatingId !== null}
+          onClose={() => setDuplicatingId(null)}
+          onSuccess={() => { setDuplicatingId(null); refetch(); }}
         />
       )}
     </div>

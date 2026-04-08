@@ -17,9 +17,9 @@
 - [x] Class cards: title, date, location, seat count, capacity progress bar, status
 - [x] Class detail screen with full roster
 - [x] Class create form (super_admin/admin)
-- [ ] Class duplicate action
-- [ ] Class archive action
-- [ ] Filter classes: upcoming, past, location, instructor, full/not full
+- [x] Class duplicate action
+- [x] Class archive action
+- [x] Filter classes: upcoming, past, location, instructor, full/not full
 
 ## Roster & Enrollment
 - [x] Roster table per class: name, email, payment status pill, source, attendance
@@ -41,7 +41,7 @@
 - [x] Move student modal: current class, destination class dropdown, seat availability check
 - [x] Atomic transaction: remove from old, add to new, update both counts, log activity
 - [x] Block move if destination is full
-- [ ] Optional notify student toggle on move
+- [x] Optional notify student toggle on move
 
 ## WooCommerce Integration
 - [x] WooCommerce webhook endpoint (POST /api/webhooks/woocommerce)
@@ -57,7 +57,7 @@
 - [x] Email queue with retry tracking
 - [x] Email failures visible in admin dashboard
 - [x] Email templates: confirmation, reminder
-- [ ] Live email sending (requires MAILGUN_API_KEY secret)
+- [x] Live email sending (requires MAILGUN_API_KEY — enter in Admin → Settings tab)
 
 ## CSV Export
 - [x] Per-class CSV export: first name, last name, email, phone, class title, date, location, payment status, attendance status
