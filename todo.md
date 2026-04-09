@@ -114,3 +114,34 @@
 
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
+
+## New Features (V1.5)
+
+### Edit Student Profile
+- [x] Edit student modal: update name, email, phone fields
+- [x] Server: students.update mutation (name, email, phone)
+- [x] Show edit button on ClassDetail roster row (three-dot menu)
+
+### Class Check-In
+- [x] Check-in toggle per enrollment on ClassDetail roster (tap to mark present/absent)
+- [x] Bulk check-in: "Check In All" button for quick full-class attendance
+- [x] Check-in timestamp stored on enrollment record
+- [x] Check-in summary shown on ClassDetail (X of Y checked in)
+- [x] Server: enrollments.checkIn mutation (toggle attended status + timestamp)
+- [x] Server: enrollments.bulkCheckIn mutation
+
+### Manual Confirmation / Reminder Emails
+- [x] "Send Confirmation" button per enrollment on ClassDetail roster (three-dot menu)
+- [x] "Send Reminder" button per enrollment on ClassDetail roster (three-dot menu)
+- [x] "Send Reminder to All" bulk action on ClassDetail
+- [x] Server: enrollments.sendConfirmationEmail and enrollments.sendReminderEmail mutations
+- [x] Server: enrollments.sendBulkReminders mutation
+- [x] Toast feedback on send success/failure
+
+### CCW Renewal Reminder (18-month auto-email)
+- [x] DB: ccwRenewalReminders table (enrollmentId, scheduledAt, sentAt, status)
+- [x] On enrollment in any CCW Initial class, schedule a reminder for 18 months out
+- [x] Scheduler checks for due CCW reminders every 15 minutes and sends email
+- [x] Email includes student name, original class date, link to purchase renewal
+- [x] Admin panel: CCW Renewals tab showing upcoming and sent reminders with stats
+- [x] Server: ccwRenewals.list, sendNow, processNow, cancel, stats procedures

@@ -9,10 +9,16 @@
  * Called by server/_core/index.ts on a 15-minute interval.
  */
 
-import { and, eq, gte, lte, lt, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
+import mysql from "mysql2/promise";
 import { getDb } from "./db";
 import { sendEmailViaMailgun } from "./email";
 import { emailQueue, enrollments, classes, students, locations } from "../drizzle/schema";
+
+// Raw MySQL connection for queries that Drizzle can't run as prepared statements (e.g. parameterized LIMIT)
+async function getRawConn() {
+  return mysql.createConnection(process.env.DATABASE_URL!);
+}
 
 const MAX_ATTEMPTS = 5;
 
@@ -23,17 +29,13 @@ export async function processEmailQueue(): Promise<void> {
   if (!db) return;
 
   // Pick up pending emails and failed emails that are due for retry
-  const pending = await db
-    .select()
-    .from(emailQueue)
-    .where(
-      and(
-        sql`${emailQueue.status} IN ('pending', 'failed')`,
-        lt(emailQueue.retryCount, MAX_ATTEMPTS),
-        sql`(${emailQueue.scheduledFor} IS NULL OR ${emailQueue.scheduledFor} <= NOW())`
-      )
-    )
-    .limit(50);
+  // NOTE: Use raw mysql2 connection to avoid MySQL prepared-statement LIMIT parameter issue
+  const rawConn = await getRawConn();
+  const [pendingRaw] = await rawConn.query(
+    `SELECT * FROM emailQueue WHERE status IN ('pending', 'failed') AND retryCount < ${MAX_ATTEMPTS} AND (scheduledFor IS NULL OR scheduledFor <= NOW()) LIMIT 50`
+  );
+  await rawConn.end();
+  const pending = pendingRaw as typeof emailQueue.$inferSelect[];
 
   for (const item of pending) {
     try {
@@ -124,7 +126,7 @@ export async function scheduleReminderEmails(): Promise<void> {
           eq(emailQueue.templateKey, "reminder")
         )
       )
-      .limit(1);
+      .limit(1 as number);
 
     if (existing.length > 0) continue; // Already queued
 

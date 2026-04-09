@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `ccwRenewalReminders` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`enrollmentId` int NOT NULL,\n\t`studentId` int NOT NULL,\n\t`classId` int NOT NULL,\n\t`scheduledFor` timestamp NOT NULL,\n\t`sentAt` timestamp,\n\t`status` enum('pending','sent','cancelled') NOT NULL DEFAULT 'pending',\n\t`emailQueueId` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `ccwRenewalReminders_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2qZ1d2ho4rYKYe1.21ab2fbe9781 --database 94KLU95dXj2TnxxpFKwJoW --execute CREATE TABLE `ccwRenewalReminders` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`enrollmentId` int NOT NULL,\n\t`studentId` int NOT NULL,\n\t`classId` int NOT NULL,\n\t`scheduledFor` timestamp NOT NULL,\n\t`sentAt` timestamp,\n\t`status` enum('pending','sent','cancelled') NOT NULL DEFAULT 'pending',\n\t`emailQueueId` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `ccwRenewalReminders_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 161
+}

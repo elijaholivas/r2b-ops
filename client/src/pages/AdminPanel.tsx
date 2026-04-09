@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { SettingsTab } from "@/components/SettingsTab";
 import UsersTab from "@/components/UsersTab";
+import CCWRenewalsTab from "@/components/CCWRenewalsTab";
 
 const EMAIL_STATUS_COLORS: Record<string, string> = {
   pending: "bg-blue-900/40 text-blue-300 border-blue-700/50",
@@ -150,6 +151,9 @@ export default function AdminPanel() {
           <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Settings className="h-4 w-4 mr-1.5" />
             Settings
+          </TabsTrigger>
+          <TabsTrigger value="ccw" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            CCW Renewals
           </TabsTrigger>
           <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Users className="h-4 w-4 mr-1.5" />
@@ -349,6 +353,9 @@ export default function AdminPanel() {
         {/* Settings Tab */}
         <TabsContent value="settings" className="mt-4">
           <SettingsTab />
+        </TabsContent>
+        <TabsContent value="ccw" className="mt-4">
+          <CCWRenewalsTab />
         </TabsContent>
         <TabsContent value="users" className="mt-4">
           <UsersTab />

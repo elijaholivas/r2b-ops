@@ -10,8 +10,10 @@ import {
   Location,
   Student,
   User,
+  CcwRenewalReminder,
   activityLog,
   adminAlerts,
+  ccwRenewalReminders,
   classStaff,
   classes,
   emailQueue,
@@ -517,4 +519,151 @@ export async function getEnrollmentsNeedingReminder(): Promise<(Enrollment & { s
     }
   }
   return results;
+}
+
+// ─── Student Update ───────────────────────────────────────────────────────────
+export async function updateStudent(
+  id: number,
+  data: { firstName?: string; lastName?: string; email?: string; phone?: string | null; notes?: string | null }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(students).set(data).where(eq(students.id, id));
+}
+
+// ─── Check-In ─────────────────────────────────────────────────────────────────
+export async function checkInEnrollment(enrollmentId: number, attended: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(enrollments)
+    .set({ checkedInAt: attended ? new Date() : null })
+    .where(eq(enrollments.id, enrollmentId));
+}
+
+export async function bulkCheckIn(classId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = new Date();
+  const result = await db
+    .update(enrollments)
+    .set({ checkedInAt: now })
+    .where(and(eq(enrollments.classId, classId), eq(enrollments.status, "enrolled")));
+  return (result as any)[0]?.affectedRows ?? 0;
+}
+
+// ─── CCW Renewal Reminders ────────────────────────────────────────────────────
+export async function scheduleCcwRenewal(enrollmentId: number, studentId: number, classId: number, classDate: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Check if already scheduled
+  const existing = await db
+    .select({ id: ccwRenewalReminders.id })
+    .from(ccwRenewalReminders)
+    .where(eq(ccwRenewalReminders.enrollmentId, enrollmentId));
+  if (existing.length > 0) return;
+  // Schedule 18 months after class date
+  const scheduledFor = new Date(classDate);
+  scheduledFor.setMonth(scheduledFor.getMonth() + 18);
+  await db.insert(ccwRenewalReminders).values({
+    enrollmentId,
+    studentId,
+    classId,
+    scheduledFor,
+    status: "pending",
+  });
+}
+
+export async function listCcwRenewalReminders(filter?: { status?: "pending" | "sent" | "cancelled" }): Promise<(CcwRenewalReminder & { student: Student; class: Class })[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: ccwRenewalReminders.id,
+      enrollmentId: ccwRenewalReminders.enrollmentId,
+      studentId: ccwRenewalReminders.studentId,
+      classId: ccwRenewalReminders.classId,
+      scheduledFor: ccwRenewalReminders.scheduledFor,
+      sentAt: ccwRenewalReminders.sentAt,
+      status: ccwRenewalReminders.status,
+      emailQueueId: ccwRenewalReminders.emailQueueId,
+      createdAt: ccwRenewalReminders.createdAt,
+      updatedAt: ccwRenewalReminders.updatedAt,
+      studentFirstName: students.firstName,
+      studentLastName: students.lastName,
+      studentEmail: students.email,
+      classTitle: classes.title,
+      classStartDatetime: classes.startDatetime,
+    })
+    .from(ccwRenewalReminders)
+    .innerJoin(students, eq(ccwRenewalReminders.studentId, students.id))
+    .innerJoin(classes, eq(ccwRenewalReminders.classId, classes.id))
+    .where(filter?.status ? eq(ccwRenewalReminders.status, filter.status) : undefined)
+    .orderBy(ccwRenewalReminders.scheduledFor);
+  return rows.map((r) => ({
+    id: r.id,
+    enrollmentId: r.enrollmentId,
+    studentId: r.studentId,
+    classId: r.classId,
+    scheduledFor: r.scheduledFor,
+    sentAt: r.sentAt,
+    status: r.status,
+    emailQueueId: r.emailQueueId,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    student: { id: r.studentId, firstName: r.studentFirstName, lastName: r.studentLastName, email: r.studentEmail } as Student,
+    class: { id: r.classId, title: r.classTitle, startDatetime: r.classStartDatetime } as Class,
+  }));
+}
+
+export async function markCcwRenewalSent(id: number, emailQueueId?: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(ccwRenewalReminders)
+    .set({ status: "sent", sentAt: new Date(), emailQueueId: emailQueueId ?? null })
+    .where(eq(ccwRenewalReminders.id, id));
+}
+
+export async function getDueCcwRenewals(): Promise<(CcwRenewalReminder & { student: Student; class: Class })[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  const rows = await db
+    .select({
+      id: ccwRenewalReminders.id,
+      enrollmentId: ccwRenewalReminders.enrollmentId,
+      studentId: ccwRenewalReminders.studentId,
+      classId: ccwRenewalReminders.classId,
+      scheduledFor: ccwRenewalReminders.scheduledFor,
+      sentAt: ccwRenewalReminders.sentAt,
+      status: ccwRenewalReminders.status,
+      emailQueueId: ccwRenewalReminders.emailQueueId,
+      createdAt: ccwRenewalReminders.createdAt,
+      updatedAt: ccwRenewalReminders.updatedAt,
+      studentFirstName: students.firstName,
+      studentLastName: students.lastName,
+      studentEmail: students.email,
+      studentPhone: students.phone,
+      classTitle: classes.title,
+      classStartDatetime: classes.startDatetime,
+    })
+    .from(ccwRenewalReminders)
+    .innerJoin(students, eq(ccwRenewalReminders.studentId, students.id))
+    .innerJoin(classes, eq(ccwRenewalReminders.classId, classes.id))
+    .where(and(eq(ccwRenewalReminders.status, "pending"), lte(ccwRenewalReminders.scheduledFor, now)));
+  return rows.map((r) => ({
+    id: r.id,
+    enrollmentId: r.enrollmentId,
+    studentId: r.studentId,
+    classId: r.classId,
+    scheduledFor: r.scheduledFor,
+    sentAt: r.sentAt,
+    status: r.status,
+    emailQueueId: r.emailQueueId,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    student: { id: r.studentId, firstName: r.studentFirstName, lastName: r.studentLastName, email: r.studentEmail, phone: r.studentPhone } as Student,
+    class: { id: r.classId, title: r.classTitle, startDatetime: r.classStartDatetime } as Class,
+  }));
 }

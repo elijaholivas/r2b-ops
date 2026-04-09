@@ -211,3 +211,18 @@ export const adminAlerts = mysqlTable("adminAlerts", {
 });
 
 export type AdminAlert = typeof adminAlerts.$inferSelect;
+
+// ─── CCW Renewal Reminders ────────────────────────────────────────────────────
+export const ccwRenewalReminders = mysqlTable("ccwRenewalReminders", {
+  id: int("id").autoincrement().primaryKey(),
+  enrollmentId: int("enrollmentId").notNull(),
+  studentId: int("studentId").notNull(),
+  classId: int("classId").notNull(),
+  scheduledFor: timestamp("scheduledFor").notNull(), // 18 months after class date
+  sentAt: timestamp("sentAt"),
+  status: mysqlEnum("status", ["pending", "sent", "cancelled"]).default("pending").notNull(),
+  emailQueueId: int("emailQueueId"), // reference to the queued email
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type CcwRenewalReminder = typeof ccwRenewalReminders.$inferSelect;

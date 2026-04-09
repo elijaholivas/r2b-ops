@@ -39,6 +39,12 @@ import {
   getEmailTemplate,
   updateEmailStatus,
   getPendingEmails,
+  updateStudent,
+  checkInEnrollment,
+  bulkCheckIn,
+  scheduleCcwRenewal,
+  listCcwRenewalReminders,
+  markCcwRenewalSent,
 } from "./db";
 import { renderTemplate, sendEmailViaMailgun } from "./email";
 import { z } from "zod";
@@ -530,9 +536,78 @@ const enrollmentsRouter = router({
       ];
       return { csv: csvLines.join("\n"), filename: `roster-${cls.title.replace(/[^a-z0-9]/gi, "-")}-${new Date().toISOString().slice(0, 10)}.csv` };
     }),
-});
 
-// ─── Students Router ──────────────────────────────────────────────────────────
+  checkIn: protectedProcedure
+    .input(z.object({ enrollmentId: z.number(), attended: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, STAFF_ROLES);
+      await checkInEnrollment(input.enrollmentId, input.attended);
+      return { success: true };
+    }),
+
+  bulkCheckIn: protectedProcedure
+    .input(z.object({ classId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, STAFF_ROLES);
+      const count = await bulkCheckIn(input.classId);
+      await logActivity({ actorUserId: ctx.user.id, actionType: "bulk_checkin", entityType: "class", entityId: input.classId, notes: `Bulk checked in ${count} students` });
+      return { success: true, count };
+    }),
+
+  sendConfirmationEmail: protectedProcedure
+    .input(z.object({ enrollmentId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, STAFF_ROLES);
+      const enrollment = await getEnrollmentById(input.enrollmentId);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+      const cls = await getClassById(enrollment.classId!);
+      const student = await getStudentById(enrollment.studentId!);
+      if (!cls || !student) throw new TRPCError({ code: "NOT_FOUND", message: "Class or student not found" });
+      const settings = await getIntegrationSettings();
+      const classDate = new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
+      const classTime = new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+      const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Enrollment Confirmation</p></div><div style="padding:24px"><p>Hi ${student.firstName},</p><p>You are confirmed for:</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Questions? Email <a href="mailto:info@r2bear.com">info@r2bear.com</a></p><p>— The Right 2 Bear Team</p></div></div>`;
+      await queueEmail({ enrollmentId: enrollment.id, classId: cls.id, studentId: student.id, toEmail: student.email, toName: `${student.firstName} ${student.lastName}`, templateKey: "confirmation", subject: `Confirmed: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
+      await updateEnrollment(enrollment.id, { confirmationSentAt: new Date() });
+      return { success: true };
+    }),
+
+  sendReminderEmail: protectedProcedure
+    .input(z.object({ enrollmentId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, STAFF_ROLES);
+      const enrollment = await getEnrollmentById(input.enrollmentId);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+      const cls = await getClassById(enrollment.classId!);
+      const student = await getStudentById(enrollment.studentId!);
+      if (!cls || !student) throw new TRPCError({ code: "NOT_FOUND", message: "Class or student not found" });
+      const classDate = new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
+      const classTime = new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+      const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Class Reminder</p></div><div style="padding:24px"><p>Hi ${student.firstName},</p><p>This is a reminder about your upcoming class:</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Please arrive 10-15 minutes early with a valid photo ID.</p><p>— The Right 2 Bear Team</p></div></div>`;
+      await queueEmail({ enrollmentId: enrollment.id, classId: cls.id, studentId: student.id, toEmail: student.email, toName: `${student.firstName} ${student.lastName}`, templateKey: "reminder", subject: `Reminder: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
+      await updateEnrollment(enrollment.id, { reminderSentAt: new Date() });
+      return { success: true };
+    }),
+
+  sendBulkReminders: protectedProcedure
+    .input(z.object({ classId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, STAFF_ROLES);
+      const enrollmentList = await getEnrollmentsForClass(input.classId);
+      const cls = await getClassById(input.classId);
+      if (!cls) throw new TRPCError({ code: "NOT_FOUND", message: "Class not found" });
+      const classDate = new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
+      const classTime = new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+      let count = 0;
+      for (const enr of enrollmentList.filter(e => e.status === "enrolled")) {
+        const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Class Reminder</p></div><div style="padding:24px"><p>Hi ${enr.student.firstName},</p><p>Reminder: your class is coming up!</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Please arrive 10-15 minutes early with a valid photo ID.</p><p>— The Right 2 Bear Team</p></div></div>`;
+        await queueEmail({ enrollmentId: enr.id, classId: cls.id, studentId: enr.student.id, toEmail: enr.student.email, toName: `${enr.student.firstName} ${enr.student.lastName}`, templateKey: "reminder", subject: `Reminder: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
+        count++;
+      }
+      return { success: true, count };
+    }),
+});
+// ─── Students Router ───────────────────────────────────────────────────────────
 
 const studentsRouter = router({
   search: protectedProcedure
@@ -549,9 +624,104 @@ const studentsRouter = router({
       const enrollmentRows = await searchStudents(student.email);
       return enrollmentRows[0] ?? { ...student, enrollments: [] };
     }),
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      firstName: z.string().min(1).optional(),
+      lastName: z.string().min(1).optional(),
+      email: z.string().email().optional(),
+      phone: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, STAFF_ROLES);
+      const { id, ...data } = input;
+      await updateStudent(id, data);
+      await logActivity({ actorUserId: ctx.user.id, actionType: "update_student", entityType: "student", entityId: id, notes: "Updated student profile" });
+      return { success: true };
+    }),
 });
-
-// ─── Admin Router ─────────────────────────────────────────────────────────────
+// ─── CCW Renewals Router ──────────────────────────────────────────────────────
+const ccwRenewalsRouter = router({
+  list: protectedProcedure
+    .input(z.object({ status: z.enum(["pending", "sent", "cancelled"]).optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      return listCcwRenewalReminders(input ?? {});
+    }),
+  cancel: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      const db = await import("./db").then(m => m.getDb());
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { eq } = await import("drizzle-orm");
+      const { ccwRenewalReminders } = await import("../drizzle/schema");
+      await db.update(ccwRenewalReminders).set({ status: "cancelled" }).where(eq(ccwRenewalReminders.id, input.id));
+      return { success: true };
+    }),
+  sendNow: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      const { getDueCcwRenewals, markCcwRenewalSent, listCcwRenewalReminders } = await import("./db");
+      const { sendEmailViaMailgun } = await import("./email");
+      const { ccwRenewalReminders } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await import("./db").then(m => m.getDb());
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Get the specific renewal
+      const rows = await listCcwRenewalReminders();
+      const renewal = rows.find(r => r.id === input.id);
+      if (!renewal) throw new TRPCError({ code: "NOT_FOUND", message: "Renewal reminder not found" });
+      // Send the email
+      await sendEmailViaMailgun({
+        to: renewal.student.email,
+        toName: `${renewal.student.firstName} ${renewal.student.lastName}`,
+        subject: "Your CCW Renewal is Coming Up — Time to Schedule!",
+        html: `<p>Hi ${renewal.student.firstName},</p><p>Your CCW certification is coming up for renewal. California requires renewal every 2 years, and your renewal window is approaching.</p><p><strong>Schedule your renewal class now</strong> to stay compliant and keep your carry permit active.</p><p><a href="https://wordpress-1501121-6113515.cloudwaysapps.com/initial-ccw/">Click here to schedule your CCW renewal</a></p><p>Right 2 Bear Firearms Training</p>`,
+      });
+      await markCcwRenewalSent(input.id);
+      return { success: true };
+    }),
+  processNow: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      const { getDueCcwRenewals, markCcwRenewalSent } = await import("./db");
+      const { sendEmailViaMailgun } = await import("./email");
+      const due = await getDueCcwRenewals();
+      let sent = 0;
+      for (const renewal of due) {
+        try {
+          await sendEmailViaMailgun({
+            to: renewal.student.email,
+            toName: `${renewal.student.firstName} ${renewal.student.lastName}`,
+            subject: "Your CCW Renewal is Coming Up — Time to Schedule!",
+            html: `<p>Hi ${renewal.student.firstName},</p><p>Your CCW certification is coming up for renewal. California requires renewal every 2 years, and your renewal window is approaching.</p><p><strong>Schedule your renewal class now</strong> to stay compliant and keep your carry permit active.</p><p><a href="https://wordpress-1501121-6113515.cloudwaysapps.com/initial-ccw/">Click here to schedule your CCW renewal</a></p><p>Right 2 Bear Firearms Training</p>`,
+          });
+          await markCcwRenewalSent(renewal.id);
+          sent++;
+        } catch (e) {
+          console.error(`[CCW Renewal] Failed to send for renewal ${renewal.id}:`, e);
+        }
+      }
+      return { sent };
+    }),
+  stats: protectedProcedure
+    .query(async ({ ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      const all = await listCcwRenewalReminders();
+      const now = new Date();
+      const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return {
+        total: all.length,
+        pending: all.filter(r => r.status === "pending").length,
+        sent: all.filter(r => r.status === "sent").length,
+        dueThisMonth: all.filter(r => r.status === "pending" && new Date(r.scheduledFor) <= thisMonthEnd).length,
+      };
+    }),
+});
+// ─── Admin Router ──────────────────────────────────────────────────────────────
 
 const adminRouter = router({
   alerts: protectedProcedure
@@ -774,6 +944,7 @@ export const appRouter = router({
   students: studentsRouter,
   admin: adminRouter,
   webhooks: webhookRouter,
+  ccwRenewals: ccwRenewalsRouter,
 });
 
 export type AppRouter = typeof appRouter;
