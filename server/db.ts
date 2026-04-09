@@ -107,6 +107,16 @@ export async function updateUserRole(userId: number, role: User["role"]): Promis
   if (!db) return;
   await db.update(users).set({ role }).where(eq(users.id, userId));
 }
+export async function resetUserPassword(userId: number, passwordHash: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ passwordHash } as any).where(eq(users.id, userId));
+}
+export async function setUserActive(userId: number, isActive: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ isActive } as any).where(eq(users.id, userId));
+}
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 

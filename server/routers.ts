@@ -34,6 +34,8 @@ import {
   updateEnrollment,
   updateIntegrationSettings,
   updateUserRole,
+  resetUserPassword,
+  setUserActive,
   getEmailTemplate,
   updateEmailStatus,
   getPendingEmails,
@@ -129,6 +131,22 @@ const authRouter = router({
     .mutation(async ({ input, ctx }) => {
       requireRole(ctx.user, ["super_admin"]);
       await updateUserRole(input.userId, input.role);
+      return { success: true };
+    }),
+  resetPassword: protectedProcedure
+    .input(z.object({ userId: z.number(), newPassword: z.string().min(8) }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ["super_admin", "admin"]);
+      const passwordHash = await bcrypt.hash(input.newPassword, 12);
+      await resetUserPassword(input.userId, passwordHash);
+      return { success: true };
+    }),
+  setUserActive: protectedProcedure
+    .input(z.object({ userId: z.number(), isActive: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ["super_admin"]);
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot deactivate your own account" });
+      await setUserActive(input.userId, input.isActive);
       return { success: true };
     }),
 });

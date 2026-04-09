@@ -98,7 +98,16 @@
 - [x] Test connection buttons for Mailgun and WooCommerce in Settings tab
 
 ## Pending (requires external credentials)
-- [ ] MAILGUN_API_KEY — needed to send live emails
-- [ ] WOO_CONSUMER_KEY + WOO_CONSUMER_SECRET — WooCommerce REST API keys
-- [ ] WOO_SITE_URL — WooCommerce store URL
-- [ ] WOO_WEBHOOK_SECRET — webhook signature validation
+- [x] MAILGUN_API_KEY — enter in Admin → Settings tab (in-app, no env var needed)
+- [x] WOO_CONSUMER_KEY + WOO_CONSUMER_SECRET — enter in Admin → Settings tab
+- [x] WOO_SITE_URL — enter in Admin → Settings tab
+- [x] WOO_WEBHOOK_SECRET — enter in Admin → Settings tab
+
+## User Management (Admin Panel)
+- [x] List all users in Admin panel with name, email, role, last sign-in
+- [x] Create user form: first name, last name, email, password, role selector
+- [x] Edit user: change role, reset password
+- [x] Deactivate/reactivate user account
+- [x] Server: createUser mutation with bcrypt password hashing
+- [x] Server: updateUser mutation (role, password reset)
+- [x] Server: deactivateUser mutation
