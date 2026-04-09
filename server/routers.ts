@@ -75,11 +75,17 @@ const authRouter = router({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       }
 
-      // Issue JWT session cookie
+      // Issue JWT session cookie — payload must match sdk.verifySession() expectations:
+      // requires openId, appId (VITE_APP_ID), and name fields
       const { SignJWT } = await import("jose");
       const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret");
-      const token = await new SignJWT({ userId: user.id, role: user.role, openId: user.openId ?? `local-${user.id}` })
-        .setProtectedHeader({ alg: "HS256" })
+      const openId = user.openId ?? `local-${user.id}`;
+      const token = await new SignJWT({
+        openId,
+        appId: process.env.VITE_APP_ID ?? "",
+        name: user.name ?? user.email ?? openId,
+      })
+        .setProtectedHeader({ alg: "HS256", typ: "JWT" })
         .setExpirationTime("7d")
         .sign(secret);
 

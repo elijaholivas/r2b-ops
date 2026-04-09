@@ -270,8 +270,10 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    // If user not in DB, sync from OAuth server automatically.
+    // Skip this for local password-login users (openId starts with 'local-') —
+    // they are always pre-created in the DB and cannot be synced from Manus OAuth.
+    if (!user && !sessionUserId.startsWith('local-')) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({

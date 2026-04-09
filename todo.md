@@ -111,3 +111,6 @@
 - [x] Server: createUser mutation with bcrypt password hashing
 - [x] Server: updateUser mutation (role, password reset)
 - [x] Server: deactivateUser mutation
+
+## Bugs
+- [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved

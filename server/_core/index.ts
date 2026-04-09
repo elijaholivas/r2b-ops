@@ -105,7 +105,7 @@ async function startServer() {
 // Runs every 15 minutes: processes pending email queue and queues 2-day reminders
 async function runEmailScheduler() {
   try {
-    const { processEmailQueue, scheduleReminderEmails } = await import("../emailScheduler.js");
+    const { processEmailQueue, scheduleReminderEmails } = await import("../emailScheduler.ts");
     await processEmailQueue();
     await scheduleReminderEmails();
   } catch (err: any) {

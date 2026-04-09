@@ -1,63 +1,75 @@
-// R2B Ops Service Worker - Offline shell caching
-const CACHE_NAME = "r2b-ops-v1";
-const SHELL_ASSETS = ["/", "/login"];
+// R2B Ops Service Worker v3
+// Strategy: network-first for all JS/CSS/API; cache-first only for icons/images.
+// JS chunks are intentionally NOT cached to prevent React version mismatches on update.
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(SHELL_ASSETS).catch(() => {
-        // Silently fail if shell assets aren't available yet
-      });
-    })
-  );
-  self.skipWaiting();
+const CACHE_VERSION = 'r2b-ops-v3';
+
+// Install: skip waiting immediately so new SW takes over right away
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener("activate", (event) => {
+// Activate: delete ALL old caches and claim all clients immediately
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
+    caches.keys().then((cacheNames) =>
       Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        cacheNames
+          .filter((name) => name !== CACHE_VERSION)
+          .map((name) => caches.delete(name))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+// Fetch: network-first for everything except static icons/images
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
 
-  // Skip API calls, webhooks, and non-GET requests
+  // Always use network for:
+  // - API and tRPC calls
+  // - JS and CSS files (Vite hashed chunks — never cache these)
+  // - Vite dev server internals
+  // - HTML navigation (always get fresh HTML)
   if (
-    request.method !== "GET" ||
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/api/trpc")
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/api/') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.ts') ||
+    url.pathname.includes('/@') ||
+    url.pathname.includes('/.vite/') ||
+    url.pathname.includes('/node_modules/') ||
+    event.request.mode === 'navigate'
   ) {
+    event.respondWith(fetch(event.request));
     return;
   }
 
-  // Network-first for navigation, cache fallback
-  if (request.mode === "navigate") {
+  // Cache-first only for static image/icon assets
+  if (
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.webp') ||
+    url.pathname.endsWith('.jpg') ||
+    url.pathname.endsWith('.jpeg')
+  ) {
     event.respondWith(
-      fetch(request).catch(() =>
-        caches.match("/").then((cached) => cached || fetch(request))
-      )
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        });
+      })
     );
     return;
   }
 
-  // Cache-first for static assets
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok && response.type === "basic") {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return response;
-      });
-    })
-  );
+  // Default: network-first, no caching
+  event.respondWith(fetch(event.request));
 });
