@@ -115,6 +115,16 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## New Features (V1.6)
+
+### R2B Logo Branding
+- [x] Upload R2B logo as static asset (/manus-storage/r2b-logo_db30176c.png)
+- [x] Login page: R2B logo replaces Shield icon placeholder
+- [x] AppLayout sidebar: R2B logo in sidebar header and mobile top bar
+- [ ] Fix EmailScheduler 'Failed query' error in 2-day reminder scheduling (Drizzle LIMIT issue)
+- [ ] Add Change My Password screen for logged-in users
+- [ ] Add configurable CCW renewal product URL in Admin → Settings tab
+
 ## New Features (V1.5)
 
 ### Edit Student Profile

@@ -67,14 +67,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
-        <div className="w-8 h-8 rounded bg-primary flex items-center justify-center flex-shrink-0">
-          <Shield className="h-4 w-4 text-white" />
-        </div>
-        <div className="min-w-0">
-          <p className="font-bold text-foreground text-sm leading-tight">Right 2 Bear</p>
-          <p className="text-xs text-muted-foreground">Class Operations</p>
-        </div>
+      <div className="flex items-center justify-center px-4 py-4 border-b border-border">
+        <img
+          src="/manus-storage/r2b-logo_db30176c.png"
+          alt="Right 2 Bear"
+          className="h-10 w-auto object-contain"
+        />
       </div>
 
       {/* Navigation */}
@@ -165,8 +163,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            <span className="font-bold text-sm text-foreground">R2B Ops</span>
+            <img
+              src="/manus-storage/r2b-logo_db30176c.png"
+              alt="Right 2 Bear"
+              className="h-7 w-auto object-contain"
+            />
           </div>
           <div className="w-9" />
         </header>

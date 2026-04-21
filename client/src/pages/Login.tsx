@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,10 +65,13 @@ export default function Login() {
       <div className="relative w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary mb-4 shadow-lg shadow-primary/30">
-            <Shield className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-center mb-4">
+            <img
+              src="/manus-storage/r2b-logo_db30176c.png"
+              alt="Right 2 Bear"
+              className="h-24 w-auto object-contain"
+            />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Right 2 Bear</h1>
           <p className="text-muted-foreground text-sm mt-1">Class Operations Portal</p>
         </div>
 
