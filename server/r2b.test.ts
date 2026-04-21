@@ -4,11 +4,17 @@ import type { TrpcContext } from "./_core/context";
 
 // ─── Mock database helpers ────────────────────────────────────────────────────
 
+vi.mock("bcryptjs", () => ({
+  compare: vi.fn(),
+  hash: vi.fn(),
+}));
+
 vi.mock("./db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./db")>();
   return {
     ...actual,
     getUserByEmail: vi.fn(),
+    resetUserPassword: vi.fn(),
     getClassById: vi.fn(),
     getEnrollmentsForClass: vi.fn(),
     findActiveEnrollment: vi.fn(),
@@ -299,5 +305,61 @@ describe("admin.emailQueue", () => {
     const caller = appRouter.createCaller(makeCtx());
     const result = await caller.admin.emailQueue();
     expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── Change Password tests ────────────────────────────────────────────────────
+
+describe("auth.changePassword", () => {
+  it("throws UNAUTHORIZED when current password is incorrect", async () => {
+    const { getUserByEmail } = await import("./db");
+    const bcrypt = await import("bcryptjs");
+    vi.mocked(getUserByEmail).mockResolvedValue({
+      id: 1,
+      email: "test@r2bear.com",
+      passwordHash: "$2b$12$hashedpassword",
+      isActive: true,
+      openId: "local-1",
+      name: "Test User",
+      role: "staff" as const,
+      loginMethod: "password",
+      phone: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+    vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
+
+    const caller = appRouter.createCaller(makeCtx({ email: "test@r2bear.com" }));
+    await expect(
+      caller.auth.changePassword({ currentPassword: "wrongpassword", newPassword: "newpassword123" })
+    ).rejects.toThrow();
+  });
+
+  it("succeeds when current password is correct", async () => {
+    const { getUserByEmail, resetUserPassword } = await import("./db");
+    const bcrypt = await import("bcryptjs");
+    vi.mocked(getUserByEmail).mockResolvedValue({
+      id: 1,
+      email: "test@r2bear.com",
+      passwordHash: "$2b$12$hashedpassword",
+      isActive: true,
+      openId: "local-1",
+      name: "Test User",
+      role: "staff" as const,
+      loginMethod: "password",
+      phone: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+    vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+    vi.mocked(bcrypt.hash).mockResolvedValue("$2b$12$newhash" as never);
+    vi.mocked(resetUserPassword).mockResolvedValue(undefined);
+
+    const caller = appRouter.createCaller(makeCtx({ email: "test@r2bear.com" }));
+    const result = await caller.auth.changePassword({ currentPassword: "correctpassword", newPassword: "newpassword123" });
+    expect(result.success).toBe(true);
+    expect(resetUserPassword).toHaveBeenCalledWith(1, "$2b$12$newhash");
   });
 });

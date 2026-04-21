@@ -1,0 +1,1 @@
+ALTER TABLE `integrationSettings` ADD `ccwRenewalProductUrl` varchar(1024);

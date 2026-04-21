@@ -161,6 +161,26 @@ const authRouter = router({
       await setUserActive(input.userId, input.isActive);
       return { success: true };
     }),
+
+  changePassword: protectedProcedure
+    .input(z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8, "New password must be at least 8 characters"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Get the current user's record to verify their current password
+      const user = await getUserByEmail(ctx.user.email ?? "");
+      if (!user || !user.passwordHash) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Password change is not available for this account type" });
+      }
+      const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+      if (!valid) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Current password is incorrect" });
+      }
+      const newHash = await bcrypt.hash(input.newPassword, 12);
+      await resetUserPassword(user.id, newHash);
+      return { success: true };
+    }),
 });
 
 // ─── Classes Router ───────────────────────────────────────────────────────────
@@ -664,7 +684,7 @@ const ccwRenewalsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       requireRole(ctx.user, ADMIN_ROLES);
-      const { getDueCcwRenewals, markCcwRenewalSent, listCcwRenewalReminders } = await import("./db");
+      const { getDueCcwRenewals, markCcwRenewalSent, listCcwRenewalReminders, getIntegrationSettings } = await import("./db");
       const { sendEmailViaMailgun } = await import("./email");
       const { ccwRenewalReminders } = await import("../drizzle/schema");
       const { eq } = await import("drizzle-orm");
@@ -674,12 +694,15 @@ const ccwRenewalsRouter = router({
       const rows = await listCcwRenewalReminders();
       const renewal = rows.find(r => r.id === input.id);
       if (!renewal) throw new TRPCError({ code: "NOT_FOUND", message: "Renewal reminder not found" });
+      // Get configurable renewal product URL
+      const settings = await getIntegrationSettings();
+      const renewalUrl = settings?.ccwRenewalProductUrl || "https://r2bear.com/ccw-renewal";
       // Send the email
       await sendEmailViaMailgun({
         to: renewal.student.email,
         toName: `${renewal.student.firstName} ${renewal.student.lastName}`,
         subject: "Your CCW Renewal is Coming Up — Time to Schedule!",
-        html: `<p>Hi ${renewal.student.firstName},</p><p>Your CCW certification is coming up for renewal. California requires renewal every 2 years, and your renewal window is approaching.</p><p><strong>Schedule your renewal class now</strong> to stay compliant and keep your carry permit active.</p><p><a href="https://wordpress-1501121-6113515.cloudwaysapps.com/initial-ccw/">Click here to schedule your CCW renewal</a></p><p>Right 2 Bear Firearms Training</p>`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">CCW Renewal Reminder</p></div><div style="padding:24px"><p>Hi ${renewal.student.firstName},</p><p>Your CCW certification is coming up for renewal. California requires renewal every 2 years, and your renewal window is approaching.</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><p style="margin:0"><strong>Action Required:</strong> Schedule your CCW renewal class to stay compliant and keep your carry permit active.</p></div><p style="text-align:center;margin:24px 0"><a href="${renewalUrl}" style="background:#c0392b;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">Schedule My CCW Renewal</a></p><p>Questions? Email us at <a href="mailto:info@r2bear.com">info@r2bear.com</a></p><p>— Right 2 Bear Firearms Training</p></div></div>`,
       });
       await markCcwRenewalSent(input.id);
       return { success: true };
@@ -687,9 +710,11 @@ const ccwRenewalsRouter = router({
   processNow: protectedProcedure
     .mutation(async ({ ctx }) => {
       requireRole(ctx.user, ADMIN_ROLES);
-      const { getDueCcwRenewals, markCcwRenewalSent } = await import("./db");
+      const { getDueCcwRenewals, markCcwRenewalSent, getIntegrationSettings } = await import("./db");
       const { sendEmailViaMailgun } = await import("./email");
       const due = await getDueCcwRenewals();
+      const settings = await getIntegrationSettings();
+      const renewalUrl = settings?.ccwRenewalProductUrl || "https://r2bear.com/ccw-renewal";
       let sent = 0;
       for (const renewal of due) {
         try {
@@ -697,7 +722,7 @@ const ccwRenewalsRouter = router({
             to: renewal.student.email,
             toName: `${renewal.student.firstName} ${renewal.student.lastName}`,
             subject: "Your CCW Renewal is Coming Up — Time to Schedule!",
-            html: `<p>Hi ${renewal.student.firstName},</p><p>Your CCW certification is coming up for renewal. California requires renewal every 2 years, and your renewal window is approaching.</p><p><strong>Schedule your renewal class now</strong> to stay compliant and keep your carry permit active.</p><p><a href="https://wordpress-1501121-6113515.cloudwaysapps.com/initial-ccw/">Click here to schedule your CCW renewal</a></p><p>Right 2 Bear Firearms Training</p>`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">CCW Renewal Reminder</p></div><div style="padding:24px"><p>Hi ${renewal.student.firstName},</p><p>Your CCW certification is coming up for renewal. California requires renewal every 2 years, and your renewal window is approaching.</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><p style="margin:0"><strong>Action Required:</strong> Schedule your CCW renewal class to stay compliant and keep your carry permit active.</p></div><p style="text-align:center;margin:24px 0"><a href="${renewalUrl}" style="background:#c0392b;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold">Schedule My CCW Renewal</a></p><p>Questions? Email us at <a href="mailto:info@r2bear.com">info@r2bear.com</a></p><p>— Right 2 Bear Firearms Training</p></div></div>`,
           });
           await markCcwRenewalSent(renewal.id);
           sent++;
@@ -789,6 +814,7 @@ const adminRouter = router({
       webhookSecret: z.string().optional(),
       mailgunApiKey: z.string().optional(),
       mailgunDomain: z.string().optional(),
+      ccwRenewalProductUrl: z.string().url().optional().or(z.literal("")),
     }))
     .mutation(async ({ input, ctx }) => {
       requireRole(ctx.user, ["super_admin"]);

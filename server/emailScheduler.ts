@@ -7,13 +7,16 @@
  *      a reminder email if one hasn't been sent yet
  *
  * Called by server/_core/index.ts on a 15-minute interval.
+ *
+ * NOTE: Both functions use raw mysql2/promise connections to avoid the MySQL prepared-statement
+ * LIMIT parameter issue that occurs with Drizzle ORM's parameterized queries.
  */
 
-import { and, eq, gte, lte, sql } from "drizzle-orm";
 import mysql from "mysql2/promise";
 import { getDb } from "./db";
 import { sendEmailViaMailgun } from "./email";
-import { emailQueue, enrollments, classes, students, locations } from "../drizzle/schema";
+import { emailQueue } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 // Raw MySQL connection for queries that Drizzle can't run as prepared statements (e.g. parameterized LIMIT)
 async function getRawConn() {
@@ -88,46 +91,48 @@ export async function scheduleReminderEmails(): Promise<void> {
   const windowStart = new Date(now.getTime() + 47 * 60 * 60 * 1000);
   const windowEnd = new Date(now.getTime() + 49 * 60 * 60 * 1000);
 
-  const dueEnrollments = await db
-    .select({
-      enrollmentId: enrollments.id,
-      studentId: enrollments.studentId,
-      classId: enrollments.classId,
-      studentFirstName: students.firstName,
-      studentLastName: students.lastName,
-      studentEmail: students.email,
-      classTitle: classes.title,
-      classStartDatetime: classes.startDatetime,
-      locationName: locations.name,
-      locationAddress1: locations.address1,
-      locationCity: locations.city,
-      locationState: locations.state,
-    })
-    .from(enrollments)
-    .innerJoin(students, eq(enrollments.studentId, students.id))
-    .innerJoin(classes, eq(enrollments.classId, classes.id))
-    .innerJoin(locations, eq(classes.locationId, locations.id))
-    .where(
-      and(
-        eq(enrollments.status, "enrolled"),
-        gte(classes.startDatetime, windowStart),
-        lte(classes.startDatetime, windowEnd)
-      )
+  // Use raw mysql2 to avoid Drizzle prepared-statement LIMIT issue
+  const rawConn = await getRawConn();
+
+  let dueEnrollments: any[] = [];
+  try {
+    const [rows] = await rawConn.query(
+      `SELECT
+        e.id AS enrollmentId,
+        e.studentId,
+        e.classId,
+        s.firstName AS studentFirstName,
+        s.lastName AS studentLastName,
+        s.email AS studentEmail,
+        c.title AS classTitle,
+        c.startDatetime AS classStartDatetime,
+        l.name AS locationName,
+        l.address1 AS locationAddress1,
+        l.city AS locationCity,
+        l.state AS locationState
+      FROM enrollments e
+      INNER JOIN students s ON e.studentId = s.id
+      INNER JOIN classes c ON e.classId = c.id
+      INNER JOIN locations l ON c.locationId = l.id
+      WHERE e.status = 'enrolled'
+        AND c.startDatetime >= ?
+        AND c.startDatetime <= ?`,
+      [windowStart, windowEnd]
     );
+    dueEnrollments = rows as any[];
+  } catch (err: any) {
+    console.error("[EmailScheduler] Error fetching due enrollments:", err.message);
+    await rawConn.end();
+    return;
+  }
 
   for (const row of dueEnrollments) {
-    // Check if a reminder has already been queued for this enrollment
-    const existing = await db
-      .select({ id: emailQueue.id })
-      .from(emailQueue)
-      .where(
-        and(
-          eq(emailQueue.enrollmentId, row.enrollmentId),
-          eq(emailQueue.templateKey, "reminder")
-        )
-      )
-      .limit(1 as number);
-
+    // Check if a reminder has already been queued for this enrollment (raw query to avoid LIMIT issue)
+    const [existingRows] = await rawConn.query(
+      `SELECT id FROM emailQueue WHERE enrollmentId = ? AND templateKey = 'reminder' LIMIT 1`,
+      [row.enrollmentId]
+    );
+    const existing = existingRows as any[];
     if (existing.length > 0) continue; // Already queued
 
     const classDate = new Date(row.classStartDatetime).toLocaleDateString("en-US", {
@@ -186,4 +191,6 @@ export async function scheduleReminderEmails(): Promise<void> {
 
     console.log(`[EmailScheduler] Queued reminder for enrollment ${row.enrollmentId} (${row.studentEmail})`);
   }
+
+  await rawConn.end();
 }

@@ -9,6 +9,7 @@ import {
   Save,
   CheckCircle2,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +70,10 @@ export function SettingsTab() {
   const [wooConsumerSecret, setWooConsumerSecret] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
 
+  // CCW Renewal fields
+  const [ccwRenewalProductUrl, setCcwRenewalProductUrl] = useState("");
+  const [ccwSaved, setCcwSaved] = useState(false);
+
   const [mailgunSaved, setMailgunSaved] = useState(false);
   const [wooSaved, setWooSaved] = useState(false);
 
@@ -76,11 +81,16 @@ export function SettingsTab() {
     onSuccess: (_, variables) => {
       utils.admin.integrationSettings.invalidate();
       const isMailgun = "mailgunApiKey" in variables || "mailgunDomain" in variables;
+      const isCcw = "ccwRenewalProductUrl" in variables;
       if (isMailgun) {
         setMailgunSaved(true);
         setMailgunApiKey("");
         toast.success("Mailgun settings saved");
         setTimeout(() => setMailgunSaved(false), 3000);
+      } else if (isCcw) {
+        setCcwSaved(true);
+        toast.success("CCW renewal URL saved");
+        setTimeout(() => setCcwSaved(false), 3000);
       } else {
         setWooSaved(true);
         setWooConsumerKey("");
@@ -115,6 +125,15 @@ export function SettingsTab() {
       return;
     }
     updateSettings.mutate(payload);
+  };
+
+  const saveCcwUrl = () => {
+    const url = ccwRenewalProductUrl.trim();
+    if (!url) {
+      toast.error("Enter a URL to save");
+      return;
+    }
+    updateSettings.mutate({ ccwRenewalProductUrl: url });
   };
 
   if (isLoading) {
@@ -273,6 +292,69 @@ export function SettingsTab() {
                 <Save className="h-4 w-4 mr-1.5" />
               )}
               {wooSaved ? "Saved!" : "Save WooCommerce Settings"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator className="bg-border" />
+
+      {/* CCW Renewal Product URL Section */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <RefreshCw className="h-4 w-4 text-primary" />
+            CCW Renewal — Product Link
+            {settings?.ccwRenewalProductUrl && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-green-400 font-normal">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Configured
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-sm text-foreground">CCW Renewal Product URL</Label>
+            <Input
+              type="url"
+              placeholder={settings?.ccwRenewalProductUrl ?? "https://your-store.com/product/ccw-renewal"}
+              value={ccwRenewalProductUrl}
+              onChange={(e) => setCcwRenewalProductUrl(e.target.value)}
+              className="bg-secondary border-border text-foreground placeholder:text-muted-foreground font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Full URL to the CCW renewal product on your WooCommerce store. This link is included in the 18-month CCW renewal reminder emails.
+            </p>
+          </div>
+          {settings?.ccwRenewalProductUrl && (
+            <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">Current URL:</p>
+              <a
+                href={settings.ccwRenewalProductUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-mono text-primary hover:underline break-all"
+              >
+                {settings.ccwRenewalProductUrl}
+              </a>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button
+              onClick={saveCcwUrl}
+              disabled={updateSettings.isPending}
+              size="sm"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              {updateSettings.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : ccwSaved ? (
+                <CheckCircle2 className="h-4 w-4 mr-1.5 text-green-300" />
+              ) : (
+                <Save className="h-4 w-4 mr-1.5" />
+              )}
+              {ccwSaved ? "Saved!" : "Save CCW Renewal URL"}
             </Button>
           </div>
         </CardContent>

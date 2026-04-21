@@ -192,6 +192,7 @@ export const integrationSettings = mysqlTable("integrationSettings", {
   mailgunDomain: varchar("mailgunDomain", { length: 255 }).default("mail.r2bear.com"),
   defaultFromEmail: varchar("defaultFromEmail", { length: 320 }).default("info@mail.r2bear.com"),
   defaultReplyTo: varchar("defaultReplyTo", { length: 320 }).default("info@r2bear.com"),
+  ccwRenewalProductUrl: varchar("ccwRenewalProductUrl", { length: 1024 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

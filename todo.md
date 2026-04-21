@@ -121,9 +121,9 @@
 - [x] Upload R2B logo as static asset (/manus-storage/r2b-logo_db30176c.png)
 - [x] Login page: R2B logo replaces Shield icon placeholder
 - [x] AppLayout sidebar: R2B logo in sidebar header and mobile top bar
-- [ ] Fix EmailScheduler 'Failed query' error in 2-day reminder scheduling (Drizzle LIMIT issue)
-- [ ] Add Change My Password screen for logged-in users
-- [ ] Add configurable CCW renewal product URL in Admin → Settings tab
+- [x] Fix EmailScheduler 'Failed query' error in 2-day reminder scheduling (Drizzle LIMIT issue)
+- [x] Add Change My Password screen for logged-in users
+- [x] Add configurable CCW renewal product URL in Admin → Settings tab
 
 ## New Features (V1.5)
 

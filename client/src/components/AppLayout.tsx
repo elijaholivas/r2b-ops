@@ -14,6 +14,7 @@ import {
   Bell,
   Shield,
   ChevronRight,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,6 +114,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </span>
           </div>
         )}
+        <Link href="/change-password">
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <KeyRound className="h-4 w-4" />
+            Change Password
+          </button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"
