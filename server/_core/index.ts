@@ -31,19 +31,21 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Storage proxy for /manus-storage/* assets
-  registerStorageProxy(app);
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
 
-  // Raw WooCommerce webhook endpoint — must be registered BEFORE express.json() parses the body
-  // so we can access the raw bytes for HMAC-SHA256 signature validation
-  app.post("/api/webhooks/woocommerce", express.raw({ type: "application/json" }), async (req, res) => {
+  // Raw WooCommerce webhook endpoint — MUST be registered BEFORE express.json() so we
+  // receive the raw bytes needed for HMAC-SHA256 signature validation.
+  app.post("/api/webhooks/woocommerce", express.raw({ type: "*/*" }), async (req, res) => {
     try {
-      const rawBody = req.body as Buffer;
+      // req.body is a Buffer when express.raw() fires; guard against already-parsed objects
+      let rawBody: Buffer;
+      if (Buffer.isBuffer(req.body)) {
+        rawBody = req.body;
+      } else if (typeof req.body === "string") {
+        rawBody = Buffer.from(req.body, "utf8");
+      } else {
+        rawBody = Buffer.from(JSON.stringify(req.body), "utf8");
+      }
+
       const signature = req.headers["x-wc-webhook-signature"] as string | undefined;
       // Read webhook secret from DB settings first, fall back to env var
       const { getIntegrationSettings } = await import("../db");
@@ -63,18 +65,27 @@ async function startServer() {
         }
       }
 
-      const payload = JSON.parse(rawBody.toString("utf8"));
-      const event = req.headers["x-wc-webhook-topic"] as string ?? "order.created";
+      const bodyStr = rawBody.toString("utf8");
+      const payload = JSON.parse(bodyStr);
+      const event = (req.headers["x-wc-webhook-topic"] as string) ?? "order.created";
 
       // Delegate to the tRPC webhook handler
       const caller = appRouter.createCaller({ user: null, req, res } as any);
       const result = await caller.webhooks.woocommerce({ event, payload, signature });
       res.json(result);
     } catch (err: any) {
-      console.error("[Webhook] Processing error:", err.message);
-      res.status(500).json({ error: "Webhook processing failed" });
+      console.error("[Webhook] Processing error:", err.message, err.stack);
+      res.status(500).json({ error: "Webhook processing failed", detail: err.message });
     }
   });
+
+  // Configure body parser with larger size limit for file uploads
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Storage proxy for /manus-storage/* assets
+  registerStorageProxy(app);
+  // OAuth callback under /api/oauth/callback
+  registerOAuthRoutes(app);
 
   // tRPC API
   app.use(

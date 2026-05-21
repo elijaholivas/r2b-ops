@@ -471,10 +471,20 @@ export async function markAlertRead(id: number): Promise<void> {
 // ─── Integration Settings ─────────────────────────────────────────────────────
 
 export async function getIntegrationSettings() {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(integrationSettings).limit(1);
-  return result[0];
+  if (!process.env.DATABASE_URL) return undefined;
+  const mysql = await import("mysql2/promise");
+  const conn = await mysql.default.createConnection(process.env.DATABASE_URL);
+  try {
+    const [rows] = await conn.query(
+      `SELECT id, wooBaseUrl, wooConsumerKey, wooConsumerSecret, webhookSecret,
+              mailgunApiKey, mailgunDomain, defaultFromEmail, defaultReplyTo,
+              ccwRenewalProductUrl, createdAt, updatedAt
+       FROM integrationSettings LIMIT 1`
+    ) as any;
+    return (rows as any[])[0] ?? undefined;
+  } finally {
+    await conn.end();
+  }
 }
 
 export async function updateIntegrationSettings(data: Partial<typeof integrationSettings.$inferInsert>): Promise<void> {

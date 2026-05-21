@@ -115,6 +115,9 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## Bugs (V1.8)
+- [x] Fix WooCommerce webhook endpoint returning HTTP 500 on delivery test
+
 ## New Features (V1.6)
 
 ### R2B Logo Branding
