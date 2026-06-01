@@ -882,32 +882,69 @@ const adminRouter = router({
 
     // Helper: parse the advanced-date meta field
     // WooCommerce Advanced Custom Fields stores date as an object with keys:
-    // { start_date, start_time, end_date, end_time } or a serialized PHP string
-    function parseAdvancedDate(meta: any): { start: Date; end: Date } | null {
+    // Parses WooCommerce advanced-date meta fields.
+    // The plugin stores:
+    //   class_date          → Unix timestamp (seconds) of start
+    //   class_date__end_date → Unix timestamp (seconds) of end
+    //   class_date__config  → JSON string with human-readable dates as backup
+    function parseAdvancedDate(
+      meta: any,
+      metaMap?: Record<string, any>
+    ): { start: Date; end: Date } | null {
       if (!meta) return null;
       try {
-        let obj = meta;
-        if (typeof meta === "string") {
-          // Try JSON first
-          try { obj = JSON.parse(meta); } catch (_) {
-            // Try to extract dates from string like "June 7, 2026 8:00 am|June 8, 2026 4:00 pm"
-            const parts = meta.split("|");
-            const start = new Date(parts[0]?.trim());
-            const end = parts[1] ? new Date(parts[1].trim()) : new Date(start.getTime() + 8 * 3600000);
-            if (!isNaN(start.getTime())) return { start, end };
-            return null;
+        // Case 1: Unix timestamp string/number (primary WooCommerce storage)
+        const asNum = typeof meta === "string" ? parseInt(meta, 10) : (typeof meta === "number" ? meta : NaN);
+        if (!isNaN(asNum) && asNum > 1000000000) {
+          const start = new Date(asNum * 1000);
+          // Look for end timestamp in metaMap
+          let end: Date;
+          if (metaMap) {
+            const endTs = metaMap["class_date__end_date"];
+            const endNum = endTs ? parseInt(String(endTs), 10) : NaN;
+            end = (!isNaN(endNum) && endNum > asNum)
+              ? new Date(endNum * 1000)
+              : new Date(start.getTime() + 8 * 3600000);
+          } else {
+            end = new Date(start.getTime() + 8 * 3600000);
           }
+          if (!isNaN(start.getTime())) return { start, end };
         }
-        // Object form: { start_date: "2026-06-07", start_time: "08:00", end_date: "2026-06-08", end_time: "16:00" }
-        const startStr = obj.start_date || obj.date || obj.start;
-        const startTime = obj.start_time || obj.time || "08:00";
-        const endStr = obj.end_date || obj.end;
-        const endTime = obj.end_time || "17:00";
-        if (!startStr) return null;
-        const start = new Date(`${startStr} ${startTime}`);
-        const end = endStr ? new Date(`${endStr} ${endTime}`) : new Date(start.getTime() + 8 * 3600000);
-        if (isNaN(start.getTime())) return null;
-        return { start, end };
+
+        // Case 2: JSON config string (fallback) — {"date":"2026-08-26","time":"08:00","end_date":"2026-08-26","end_time":"16:00"}
+        if (typeof meta === "string") {
+          try {
+            const obj = JSON.parse(meta);
+            const startStr = obj.date || obj.start_date || obj.start;
+            const startTime = obj.time || obj.start_time || "08:00";
+            const endStr = obj.end_date || obj.end;
+            const endTime = obj.end_time || "17:00";
+            if (!startStr) return null;
+            const start = new Date(`${startStr}T${startTime}:00`);
+            const end = endStr ? new Date(`${endStr}T${endTime}:00`) : new Date(start.getTime() + 8 * 3600000);
+            if (!isNaN(start.getTime())) return { start, end };
+          } catch (_) { /* not JSON */ }
+
+          // Case 3: Pipe-delimited human-readable string
+          const parts = meta.split("|");
+          const start = new Date(parts[0]?.trim());
+          const end = parts[1] ? new Date(parts[1].trim()) : new Date(start.getTime() + 8 * 3600000);
+          if (!isNaN(start.getTime())) return { start, end };
+        }
+
+        // Case 4: Object form
+        if (typeof meta === "object" && meta !== null) {
+          const startStr = meta.start_date || meta.date || meta.start;
+          const startTime = meta.start_time || meta.time || "08:00";
+          const endStr = meta.end_date || meta.end;
+          const endTime = meta.end_time || "17:00";
+          if (!startStr) return null;
+          const start = new Date(`${startStr}T${startTime}:00`);
+          const end = endStr ? new Date(`${endStr}T${endTime}:00`) : new Date(start.getTime() + 8 * 3600000);
+          if (!isNaN(start.getTime())) return { start, end };
+        }
+
+        return null;
       } catch (_) { return null; }
     }
 
@@ -944,8 +981,9 @@ const adminRouter = router({
       const classLocation = metaData["class_location"] || null;
       const stockQty = product.stock_quantity;
       const capacity = (stockQty && stockQty > 0) ? stockQty : 20;
+      // Pass full metaData so parseAdvancedDate can read class_date__end_date
       const locationId = matchLocation(classLocation);
-      const dates = parseAdvancedDate(classDateMeta);
+      const dates = parseAdvancedDate(classDateMeta, metaData);
 
       if (product.type === "variable" && product.variations?.length > 0) {
         // Fetch variations
@@ -964,7 +1002,7 @@ const adminRouter = router({
               // Use variation meta for date if available, else fall back to parent
               const varMeta: Record<string, any> = {};
               for (const m of (v.meta_data ?? [])) varMeta[m.key] = m.value;
-              const varDates = parseAdvancedDate(varMeta["class_date"]) ?? dates;
+              const varDates = parseAdvancedDate(varMeta["class_date"], varMeta) ?? dates;
               if (!varDates) {
                 results.push({ id: product.id, name: product.name, variationId: v.id, variationName: attrLabel, action: "skipped", reason: "No class_date found" });
                 continue;
