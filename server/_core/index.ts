@@ -68,8 +68,18 @@ async function startServer() {
       }
 
       const bodyStr = rawBody.toString("utf8");
-      const payload = JSON.parse(bodyStr);
+      const contentType = (req.headers["content-type"] ?? "").toLowerCase();
       const event = (req.headers["x-wc-webhook-topic"] as string) ?? "order.created";
+
+      // WooCommerce sends the save/test ping as application/x-www-form-urlencoded
+      // with body "webhook_id=N" — respond 200 immediately, nothing to process.
+      if (contentType.includes("application/x-www-form-urlencoded") || !bodyStr.trim().startsWith("{")) {
+        console.log("[Webhook] Ping/test delivery received — responding 200");
+        res.json({ success: true, message: "Ping received" });
+        return;
+      }
+
+      const payload = JSON.parse(bodyStr);
 
       // Delegate to the tRPC webhook handler
       const caller = appRouter.createCaller({ user: null, req, res } as any);
