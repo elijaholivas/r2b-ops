@@ -252,6 +252,7 @@ const classesRouter = router({
       status: z.enum(["upcoming", "in_progress", "completed", "cancelled"]).optional(),
       price: z.string().optional(),
       wooProductId: z.string().optional(),
+      wooVariationId: z.string().optional(),
       startDatetime: z.string().optional(),
       endDatetime: z.string().optional(),
     }))
@@ -844,6 +845,85 @@ const adminRouter = router({
     const { processEmailQueue } = await import("./email");
     const result = await processEmailQueue();
     return result;
+  }),
+
+  syncWooProducts: protectedProcedure.mutation(async ({ ctx }) => {
+    requireRole(ctx.user, ["super_admin"]);
+    const settings = await getIntegrationSettings();
+    if (!settings?.wooBaseUrl || !settings?.wooConsumerKey || !settings?.wooConsumerSecret) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "WooCommerce credentials are not configured. Please set Store URL, Consumer Key, and Consumer Secret in Settings.",
+      });
+    }
+
+    const baseUrl = settings.wooBaseUrl.replace(/\/$/, "");
+    const auth = Buffer.from(`${settings.wooConsumerKey}:${settings.wooConsumerSecret}`).toString("base64");
+
+    // Fetch up to 100 products from WooCommerce REST API
+    const url = `${baseUrl}/wp-json/wc/v3/products?per_page=100&status=publish`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `WooCommerce API error ${response.status}: ${text.slice(0, 200)}`,
+      });
+    }
+
+    const products: any[] = await response.json();
+
+    // For each product, also fetch its variations if it has any
+    const result: Array<{
+      id: number;
+      name: string;
+      sku: string;
+      status: string;
+      price: string;
+      variationId: number | null;
+      variationName: string | null;
+    }> = [];
+
+    for (const product of products) {
+      if (product.type === "variable" && product.variations?.length > 0) {
+        // Fetch variations
+        try {
+          const varUrl = `${baseUrl}/wp-json/wc/v3/products/${product.id}/variations?per_page=100`;
+          const varRes = await fetch(varUrl, { headers: { Authorization: `Basic ${auth}` } });
+          if (varRes.ok) {
+            const variations: any[] = await varRes.json();
+            for (const v of variations) {
+              const attrLabel = v.attributes?.map((a: any) => a.option).join(", ") || `Variation #${v.id}`;
+              result.push({
+                id: product.id,
+                name: product.name,
+                sku: product.sku || "",
+                status: product.status,
+                price: v.price || product.price || "",
+                variationId: v.id,
+                variationName: attrLabel,
+              });
+            }
+            continue;
+          }
+        } catch (_) { /* fall through to simple product */ }
+      }
+      // Simple product or fallback
+      result.push({
+        id: product.id,
+        name: product.name,
+        sku: product.sku || "",
+        status: product.status,
+        price: product.price || "",
+        variationId: null,
+        variationName: null,
+      });
+    }
+
+    return { products: result, total: result.length };
   }),
 });
 

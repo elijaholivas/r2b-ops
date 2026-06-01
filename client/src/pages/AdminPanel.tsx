@@ -15,7 +15,10 @@ import {
   ChevronUp,
   Loader2,
   Users,
+  ShoppingBag,
+  Save,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -288,67 +291,7 @@ export default function AdminPanel() {
         </TabsContent>
 
         {/* WooCommerce Tab */}
-        <TabsContent value="woo" className="mt-4 space-y-4">
-          <div className="p-4 rounded-lg bg-blue-900/20 border border-blue-700/50">
-            <p className="text-sm text-blue-300">
-              WooCommerce webhook endpoint: <code className="font-mono bg-blue-900/40 px-1 rounded">/api/webhooks/woocommerce</code>
-            </p>
-            <p className="text-xs text-blue-400 mt-1">
-              Configure this URL in WooCommerce → Settings → Advanced → Webhooks. Subscribe to: Order Created, Order Updated.
-            </p>
-          </div>
-
-          {wooLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
-            </div>
-          ) : true ? (
-            <Card className="bg-card border-border">
-              <CardContent className="p-8 text-center">
-                <Link2 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-muted-foreground">No WooCommerce product mappings yet</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Mappings are created automatically when orders arrive, or manually when creating classes.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-card border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-secondary/50">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Class</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">WooCommerce Product</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[].map((mapping: any) => (
-                    <tr key={mapping.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                      <td className="px-4 py-3">
-                        <p className="text-foreground text-sm font-medium">{mapping.class?.title ?? "Unmapped"}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-muted-foreground text-xs font-mono">
-                          Product #{mapping.wooProductId}
-                          {mapping.wooVariationId && ` / Variation #${mapping.wooVariationId}`}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant="outline"
-                          className={mapping.class ? "bg-green-900/40 text-green-300 border-green-700/50" : "bg-amber-900/40 text-amber-300 border-amber-700/50"}
-                        >
-                          {mapping.class ? "Mapped" : "Unmapped"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-          )}
-        </TabsContent>
+        <WooCommerceTab />
 
         {/* Settings Tab */}
         <TabsContent value="settings" className="mt-4">
@@ -362,5 +305,210 @@ export default function AdminPanel() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// ─── WooCommerce Sync Tab ─────────────────────────────────────────────────────
+
+type WooProduct = {
+  id: number;
+  name: string;
+  sku: string;
+  status: string;
+  price: string;
+  variationId: number | null;
+  variationName: string | null;
+};
+
+function WooCommerceTab() {
+  const utils = trpc.useUtils();
+  const [products, setProducts] = useState<WooProduct[]>([]);
+  const [mappings, setMappings] = useState<Record<string, number | "">>({}); // key: "productId" or "productId_variationId" → classId
+  const [hasSynced, setHasSynced] = useState(false);
+
+  const { data: classes } = trpc.classes.list.useQuery(undefined);
+
+  const syncMutation = trpc.admin.syncWooProducts.useMutation({
+    onSuccess: (data) => {
+      setProducts(data.products);
+      setHasSynced(true);
+      toast.success(`Fetched ${data.total} product${data.total !== 1 ? "s" : ""} from WooCommerce`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateClass = trpc.classes.update.useMutation({
+    onSuccess: () => utils.classes.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  const productKey = (p: WooProduct) =>
+    p.variationId ? `${p.id}_${p.variationId}` : String(p.id);
+
+  const handleSaveMapping = async (product: WooProduct) => {
+    const classId = mappings[productKey(product)];
+    if (!classId) {
+      toast.error("Please select a class first");
+      return;
+    }
+    await updateClass.mutateAsync({
+      id: Number(classId),
+      wooProductId: String(product.id),
+      ...(product.variationId ? { wooVariationId: String(product.variationId) } : {}),
+    });
+    toast.success(`Mapped "${product.name}${product.variationName ? ` – ${product.variationName}` : ""}" to class`);
+  };
+
+  // Pre-populate mappings from existing class data
+  const existingMappings: Record<string, number> = {};
+  if (classes) {
+    for (const cls of classes) {
+      if (cls.wooProductId) {
+        const key = cls.wooVariationId
+          ? `${cls.wooProductId}_${cls.wooVariationId}`
+          : cls.wooProductId;
+        existingMappings[key] = cls.id;
+      }
+    }
+  }
+
+  const getClassIdForProduct = (p: WooProduct): number | "" => {
+    const key = productKey(p);
+    if (key in mappings) return mappings[key];
+    return existingMappings[key] ?? "";
+  };
+
+  return (
+    <TabsContent value="woo" className="mt-4 space-y-4">
+      {/* Webhook info banner */}
+      <div className="p-4 rounded-lg bg-blue-900/20 border border-blue-700/50">
+        <p className="text-sm text-blue-300 font-medium mb-0.5">Webhook endpoint</p>
+        <code className="text-xs font-mono text-blue-200 bg-blue-900/40 px-2 py-1 rounded block">
+          https://r2bclass-94klu95d.manus.space/api/webhooks/woocommerce
+        </code>
+        <p className="text-xs text-blue-400 mt-1.5">
+          Set this in WooCommerce → Settings → Advanced → Webhooks. Subscribe to: Order Created, Order Updated.
+        </p>
+      </div>
+
+      {/* Sync button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Product → Class Mapping</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Sync your WooCommerce products, then map each one to a class.
+          </p>
+        </div>
+        <Button
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          {syncMutation.isPending ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Syncing…</>
+          ) : (
+            <><ShoppingBag className="h-4 w-4 mr-2" />Sync Products from WooCommerce</>
+          )}
+        </Button>
+      </div>
+
+      {/* Product list */}
+      {!hasSynced ? (
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <ShoppingBag className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-muted-foreground">Click "Sync Products" to fetch your WooCommerce catalog</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Requires WooCommerce API credentials saved in Admin → Settings
+            </p>
+          </CardContent>
+        </Card>
+      ) : products.length === 0 ? (
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <XCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-muted-foreground">No published products found in WooCommerce</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="bg-card border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-secondary/50">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Product</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">ID</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Price</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide w-64">Map to Class</th>
+                  <th className="px-4 py-3 w-20" />
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => {
+                  const key = productKey(product);
+                  const currentClassId = getClassIdForProduct(product);
+                  const isSaved = !!existingMappings[key];
+                  return (
+                    <tr key={key} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="text-foreground font-medium text-sm">{product.name}</p>
+                        {product.variationName && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Variation: {product.variationName}</p>
+                        )}
+                        {product.sku && (
+                          <p className="text-xs text-muted-foreground font-mono">SKU: {product.sku}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-muted-foreground font-mono">
+                          #{product.id}{product.variationId ? ` / ${product.variationId}` : ""}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-foreground">{product.price ? `$${product.price}` : "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Select
+                          value={String(currentClassId || "")}
+                          onValueChange={(val) =>
+                            setMappings((prev) => ({ ...prev, [key]: val ? Number(val) : "" }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-secondary border-border">
+                            <SelectValue placeholder="Select a class…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(classes ?? []).map((cls) => (
+                              <SelectItem key={cls.id} value={String(cls.id)}>
+                                {cls.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSaveMapping(product)}
+                          disabled={updateClass.isPending}
+                          className="text-xs h-7 text-primary hover:text-primary/80"
+                        >
+                          {isSaved && !mappings[key] ? (
+                            <><CheckCircle2 className="h-3 w-3 mr-1 text-green-400" />Saved</>
+                          ) : (
+                            <><Save className="h-3 w-3 mr-1" />Save</>
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </TabsContent>
   );
 }

@@ -115,6 +115,11 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## V1.11 Features
+- [x] Clear all dummy/test classes and related data from the database
+- [x] Build Sync Products button in Admin → WooCommerce Mapping tab
+- [x] Fetch WooCommerce products via REST API and display for mapping
+
 ## Bugs (V1.8)
 - [x] Fix WooCommerce webhook endpoint returning HTTP 500 on delivery test
 
