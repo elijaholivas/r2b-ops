@@ -860,12 +860,9 @@ const adminRouter = router({
     const baseUrl = settings.wooBaseUrl.replace(/\/$/, "");
     const auth = Buffer.from(`${settings.wooConsumerKey}:${settings.wooConsumerSecret}`).toString("base64");
 
-    // Fetch up to 100 products from WooCommerce REST API
+    // Fetch up to 100 published products
     const url = `${baseUrl}/wp-json/wc/v3/products?per_page=100&status=publish`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Basic ${auth}` },
-    });
-
+    const response = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
     if (!response.ok) {
       const text = await response.text();
       throw new TRPCError({
@@ -873,21 +870,83 @@ const adminRouter = router({
         message: `WooCommerce API error ${response.status}: ${text.slice(0, 200)}`,
       });
     }
-
     const products: any[] = await response.json();
 
-    // For each product, also fetch its variations if it has any
-    const result: Array<{
+    // Load existing classes to detect already-mapped products
+    const existingClasses = await listClasses();
+    const mappedProductIds = new Set(existingClasses.map((c) => c.wooProductId).filter(Boolean));
+    const mappedVariationIds = new Set(existingClasses.map((c) => c.wooVariationId).filter(Boolean));
+
+    // Load locations for fuzzy matching
+    const allLocations = await listLocations();
+
+    // Helper: parse the advanced-date meta field
+    // WooCommerce Advanced Custom Fields stores date as an object with keys:
+    // { start_date, start_time, end_date, end_time } or a serialized PHP string
+    function parseAdvancedDate(meta: any): { start: Date; end: Date } | null {
+      if (!meta) return null;
+      try {
+        let obj = meta;
+        if (typeof meta === "string") {
+          // Try JSON first
+          try { obj = JSON.parse(meta); } catch (_) {
+            // Try to extract dates from string like "June 7, 2026 8:00 am|June 8, 2026 4:00 pm"
+            const parts = meta.split("|");
+            const start = new Date(parts[0]?.trim());
+            const end = parts[1] ? new Date(parts[1].trim()) : new Date(start.getTime() + 8 * 3600000);
+            if (!isNaN(start.getTime())) return { start, end };
+            return null;
+          }
+        }
+        // Object form: { start_date: "2026-06-07", start_time: "08:00", end_date: "2026-06-08", end_time: "16:00" }
+        const startStr = obj.start_date || obj.date || obj.start;
+        const startTime = obj.start_time || obj.time || "08:00";
+        const endStr = obj.end_date || obj.end;
+        const endTime = obj.end_time || "17:00";
+        if (!startStr) return null;
+        const start = new Date(`${startStr} ${startTime}`);
+        const end = endStr ? new Date(`${endStr} ${endTime}`) : new Date(start.getTime() + 8 * 3600000);
+        if (isNaN(start.getTime())) return null;
+        return { start, end };
+      } catch (_) { return null; }
+    }
+
+    // Helper: find location by fuzzy text match
+    function matchLocation(locationText: string | null): number | undefined {
+      if (!locationText) return undefined;
+      const lower = locationText.toLowerCase();
+      const match = allLocations.find((loc) =>
+        lower.includes(loc.name.toLowerCase()) || loc.name.toLowerCase().includes(lower.split(",")[0]?.trim() ?? "")
+      );
+      return match?.id;
+    }
+
+    type SyncResult = {
       id: number;
       name: string;
-      sku: string;
-      status: string;
-      price: string;
       variationId: number | null;
       variationName: string | null;
-    }> = [];
+      action: "created" | "skipped";
+      classId?: number;
+      reason?: string;
+    };
 
+    const results: SyncResult[] = [];
+
+    // Process each product
     for (const product of products) {
+      const metaData: Record<string, any> = {};
+      for (const m of (product.meta_data ?? [])) {
+        metaData[m.key] = m.value;
+      }
+
+      const classDateMeta = metaData["class_date"];
+      const classLocation = metaData["class_location"] || null;
+      const stockQty = product.stock_quantity;
+      const capacity = (stockQty && stockQty > 0) ? stockQty : 20;
+      const locationId = matchLocation(classLocation);
+      const dates = parseAdvancedDate(classDateMeta);
+
       if (product.type === "variable" && product.variations?.length > 0) {
         // Fetch variations
         try {
@@ -897,33 +956,70 @@ const adminRouter = router({
             const variations: any[] = await varRes.json();
             for (const v of variations) {
               const attrLabel = v.attributes?.map((a: any) => a.option).join(", ") || `Variation #${v.id}`;
-              result.push({
-                id: product.id,
-                name: product.name,
-                sku: product.sku || "",
-                status: product.status,
-                price: v.price || product.price || "",
-                variationId: v.id,
-                variationName: attrLabel,
-              });
+              const varId = String(v.id);
+              if (mappedVariationIds.has(varId)) {
+                results.push({ id: product.id, name: product.name, variationId: v.id, variationName: attrLabel, action: "skipped", reason: "Already mapped" });
+                continue;
+              }
+              // Use variation meta for date if available, else fall back to parent
+              const varMeta: Record<string, any> = {};
+              for (const m of (v.meta_data ?? [])) varMeta[m.key] = m.value;
+              const varDates = parseAdvancedDate(varMeta["class_date"]) ?? dates;
+              if (!varDates) {
+                results.push({ id: product.id, name: product.name, variationId: v.id, variationName: attrLabel, action: "skipped", reason: "No class_date found" });
+                continue;
+              }
+              const title = `${product.name}${attrLabel ? ` – ${attrLabel}` : ""}`;
+              const classId = await createClass({
+                title,
+                classType: product.categories?.[0]?.name ?? undefined,
+                description: classLocation ?? undefined,
+                locationId,
+                startDatetime: varDates.start,
+                endDatetime: varDates.end,
+                capacity,
+                price: v.price || product.price || undefined,
+                wooProductId: String(product.id),
+                wooVariationId: varId,
+                status: "upcoming",
+                isActive: true,
+              } as any);
+              results.push({ id: product.id, name: product.name, variationId: v.id, variationName: attrLabel, action: "created", classId });
             }
             continue;
           }
-        } catch (_) { /* fall through to simple product */ }
+        } catch (_) { /* fall through */ }
       }
-      // Simple product or fallback
-      result.push({
-        id: product.id,
-        name: product.name,
-        sku: product.sku || "",
-        status: product.status,
-        price: product.price || "",
-        variationId: null,
-        variationName: null,
-      });
+
+      // Simple product
+      const productId = String(product.id);
+      if (mappedProductIds.has(productId)) {
+        results.push({ id: product.id, name: product.name, variationId: null, variationName: null, action: "skipped", reason: "Already mapped" });
+        continue;
+      }
+      if (!dates) {
+        results.push({ id: product.id, name: product.name, variationId: null, variationName: null, action: "skipped", reason: "No class_date found" });
+        continue;
+      }
+      const classId = await createClass({
+        title: product.name,
+        classType: product.categories?.[0]?.name ?? undefined,
+        description: classLocation ?? undefined,
+        locationId,
+        startDatetime: dates.start,
+        endDatetime: dates.end,
+        capacity,
+        price: product.price || undefined,
+        wooProductId: productId,
+        status: "upcoming",
+        isActive: true,
+      } as any);
+      results.push({ id: product.id, name: product.name, variationId: null, variationName: null, action: "created", classId });
     }
 
-    return { products: result, total: result.length };
+    const created = results.filter((r) => r.action === "created").length;
+    const skipped = results.filter((r) => r.action === "skipped").length;
+    return { results, created, skipped, total: results.length };
   }),
 });
 

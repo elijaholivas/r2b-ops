@@ -115,6 +115,11 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## V1.12 Features
+- [x] Update syncWooProducts to parse class_date, class_location, stock qty meta and auto-create classes
+- [x] Skip products already mapped (wooProductId exists in classes table)
+- [x] Show sync results in UI (created vs skipped counts)
+
 ## V1.11 Features
 - [x] Clear all dummy/test classes and related data from the database
 - [x] Build Sync Products button in Admin → WooCommerce Mapping tab
