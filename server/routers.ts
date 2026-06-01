@@ -893,11 +893,29 @@ const adminRouter = router({
     ): { start: Date; end: Date } | null {
       if (!meta) return null;
       try {
-        // Case 1: Unix timestamp string/number (primary WooCommerce storage)
+        // Case 1 (PREFERRED): class_date__config JSON — contains exact local time as entered in WooCommerce
+        // e.g. {"date":"2026-08-26","time":"08:00","is_end_date":"1","end_date":"2026-08-26","end_time":"16:00"}
+        const configRaw = metaMap?.["class_date__config"];
+        if (configRaw) {
+          try {
+            const cfg = typeof configRaw === "string" ? JSON.parse(configRaw) : configRaw;
+            const startStr = cfg.date || cfg.start_date;
+            const startTime = (cfg.time || cfg.start_time || "08:00").replace(/(\d+:\d+).*/, "$1");
+            const endStr = cfg.end_date;
+            const endTime = (cfg.end_time || "17:00").replace(/(\d+:\d+).*/, "$1");
+            if (startStr) {
+              // Parse as local time (no Z suffix) so it isn't shifted to UTC
+              const start = new Date(`${startStr}T${startTime}:00`);
+              const end = endStr ? new Date(`${endStr}T${endTime}:00`) : new Date(start.getTime() + 8 * 3600000);
+              if (!isNaN(start.getTime())) return { start, end };
+            }
+          } catch (_) { /* fall through */ }
+        }
+
+        // Case 2: Unix timestamp string/number — treat as UTC seconds
         const asNum = typeof meta === "string" ? parseInt(meta, 10) : (typeof meta === "number" ? meta : NaN);
         if (!isNaN(asNum) && asNum > 1000000000) {
           const start = new Date(asNum * 1000);
-          // Look for end timestamp in metaMap
           let end: Date;
           if (metaMap) {
             const endTs = metaMap["class_date__end_date"];
@@ -911,33 +929,33 @@ const adminRouter = router({
           if (!isNaN(start.getTime())) return { start, end };
         }
 
-        // Case 2: JSON config string (fallback) — {"date":"2026-08-26","time":"08:00","end_date":"2026-08-26","end_time":"16:00"}
+        // Case 3: JSON string (meta itself is the config JSON)
         if (typeof meta === "string") {
           try {
             const obj = JSON.parse(meta);
             const startStr = obj.date || obj.start_date || obj.start;
-            const startTime = obj.time || obj.start_time || "08:00";
+            const startTime = (obj.time || obj.start_time || "08:00").replace(/(\d+:\d+).*/, "$1");
             const endStr = obj.end_date || obj.end;
-            const endTime = obj.end_time || "17:00";
+            const endTime = (obj.end_time || "17:00").replace(/(\d+:\d+).*/, "$1");
             if (!startStr) return null;
             const start = new Date(`${startStr}T${startTime}:00`);
             const end = endStr ? new Date(`${endStr}T${endTime}:00`) : new Date(start.getTime() + 8 * 3600000);
             if (!isNaN(start.getTime())) return { start, end };
           } catch (_) { /* not JSON */ }
 
-          // Case 3: Pipe-delimited human-readable string
+          // Case 4: Pipe-delimited human-readable string
           const parts = meta.split("|");
           const start = new Date(parts[0]?.trim());
           const end = parts[1] ? new Date(parts[1].trim()) : new Date(start.getTime() + 8 * 3600000);
           if (!isNaN(start.getTime())) return { start, end };
         }
 
-        // Case 4: Object form
+        // Case 5: Object form
         if (typeof meta === "object" && meta !== null) {
           const startStr = meta.start_date || meta.date || meta.start;
-          const startTime = meta.start_time || meta.time || "08:00";
+          const startTime = (meta.start_time || meta.time || "08:00").replace(/(\d+:\d+).*/, "$1");
           const endStr = meta.end_date || meta.end;
-          const endTime = meta.end_time || "17:00";
+          const endTime = (meta.end_time || "17:00").replace(/(\d+:\d+).*/, "$1");
           if (!startStr) return null;
           const start = new Date(`${startStr}T${startTime}:00`);
           const end = endStr ? new Date(`${endStr}T${endTime}:00`) : new Date(start.getTime() + 8 * 3600000);
