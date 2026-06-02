@@ -115,6 +115,11 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## V1.15 Features
+- [x] Download and parse class/student data files from Google Drive
+- [x] Import real classes and students into the database (additive, no deletions)
+- [x] Confirmed WooCommerce sync never deletes existing classes or students (additive only)
+
 ## V1.12 Features
 - [x] Update syncWooProducts to parse class_date, class_location, stock qty meta and auto-create classes
 - [x] Skip products already mapped (wooProductId exists in classes table)
