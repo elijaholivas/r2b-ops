@@ -149,7 +149,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-12">
             {upcomingClasses.map((cls: any) => {
               const isFull = cls.enrolledCount >= cls.capacity;
               const isNearFull = cls.enrolledCount >= cls.capacity * 0.8;
