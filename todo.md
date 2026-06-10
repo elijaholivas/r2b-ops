@@ -184,3 +184,9 @@
 - [x] Email includes student name, original class date, link to purchase renewal
 - [x] Admin panel: CCW Renewals tab showing upcoming and sent reminders with stats
 - [x] Server: ccwRenewals.list, sendNow, processNow, cancel, stats procedures
+
+## V1.18 Features
+- [x] Fix class time display — classes were showing 1-2 AM due to UTC→local timezone conversion
+- [x] Created dateUtils.ts with parseClassDatetime() that re-interprets UTC wall-clock values as the intended local time
+- [x] Updated all date display: Classes, ClassDetail, Dashboard, Archive, MoveStudentModal, StudentDetail, CCWRenewalsTab
+- [x] 10 new Vitest tests for dateUtils (26 total, all passing)

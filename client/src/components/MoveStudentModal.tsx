@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { formatClassDateMedium, formatClassDateTimeFull } from "@/lib/dateUtils";
 
 interface Props {
   open: boolean;
@@ -94,7 +95,7 @@ export default function MoveStudentModal({ open, enrollmentId, currentClassId, o
                         <div className="flex flex-col">
                           <span className="font-medium text-foreground">{cls.title}</span>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(cls.startDatetime), "MMM d, yyyy")} · {cls.capacity - cls.enrolledCount} seats open
+                            {formatClassDateMedium(cls.startDatetime)} · {cls.capacity - cls.enrolledCount} seats open
                           </span>
                         </div>
                       </SelectItem>
@@ -107,7 +108,7 @@ export default function MoveStudentModal({ open, enrollmentId, currentClassId, o
                 <div className="p-3 rounded-lg bg-secondary border border-border space-y-1">
                   <p className="text-sm font-medium text-foreground">{selectedClass.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(selectedClass.startDatetime), "EEEE, MMMM d, yyyy · h:mm a")}
+                    {formatClassDateTimeFull(selectedClass.startDatetime)}
                   </p>
                   {selectedClass.location && (
                     <p className="text-xs text-muted-foreground">{selectedClass.location.name}</p>

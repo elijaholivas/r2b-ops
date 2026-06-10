@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { format, formatDistanceToNow } from "date-fns";
+import { formatClassDateMedium } from "@/lib/dateUtils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,7 +112,7 @@ export default function CCWRenewalsTab() {
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Took class: {format(new Date(r.class.startDatetime), "MMM d, yyyy")}
+                    Took class: {formatClassDateMedium(r.class.startDatetime)}
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />

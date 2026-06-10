@@ -3,6 +3,7 @@ import { useRoute, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { format } from "date-fns";
+import { formatClassDateLong, formatClassTime } from "@/lib/dateUtils";
 import { toast } from "sonner";
 import {
   ArrowLeft, MapPin, Clock, Users, Plus, Download,
@@ -135,8 +136,8 @@ export default function ClassDetail() {
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-primary flex-shrink-0" />
               <div>
-                <p className="text-foreground font-medium">{format(new Date(cls.startDatetime), "EEEE, MMMM d, yyyy")}</p>
-                <p className="text-muted-foreground text-xs">{format(new Date(cls.startDatetime), "h:mm a")} – {format(new Date(cls.endDatetime), "h:mm a")}</p>
+                <p className="text-foreground font-medium">{formatClassDateLong(cls.startDatetime)}</p>
+                <p className="text-muted-foreground text-xs">{formatClassTime(cls.startDatetime)} – {formatClassTime(cls.endDatetime)}</p>
               </div>
             </div>
             {cls.location && (

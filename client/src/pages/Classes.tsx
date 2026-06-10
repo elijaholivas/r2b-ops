@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { format } from "date-fns";
+import { formatClassShort, parseClassDatetime } from "@/lib/dateUtils";
 import {
   CalendarDays,
   MapPin,
@@ -49,8 +49,8 @@ function CapacityBar({ enrolled, capacity }: { enrolled: number; capacity: numbe
 function getDisplayStatus(cls: { startDatetime: string | Date; endDatetime: string | Date; status: string }) {
   if (cls.status === "cancelled") return "cancelled";
   const now = new Date();
-  const start = new Date(cls.startDatetime);
-  const end = new Date(cls.endDatetime);
+  const start = parseClassDatetime(cls.startDatetime);
+  const end = parseClassDatetime(cls.endDatetime);
   if (now < start) return "upcoming";
   if (now >= start && now <= end) return "in_progress";
   return "past";
@@ -129,7 +129,7 @@ function ClassCard({
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(cls.startDatetime), "EEE, MMM d · h:mm a")}
+                    {formatClassShort(cls.startDatetime)}
                   </span>
                   {cls.location && (
                     <span className="flex items-center gap-1">
@@ -240,18 +240,18 @@ export default function Classes() {
 
   // Upcoming: start date is in the future OR class is currently in progress — sorted ascending
   const upcomingClasses = filtered
-    .filter((cls) => cls.status !== "cancelled" && new Date(cls.endDatetime) > now)
-    .sort((a, b) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime());
+    .filter((cls) => cls.status !== "cancelled" && parseClassDatetime(cls.endDatetime) > now)
+    .sort((a, b) => parseClassDatetime(a.startDatetime).getTime() - parseClassDatetime(b.startDatetime).getTime());
 
   // Past: end date has passed — sorted descending (most recent first)
   const pastClasses = filtered
-    .filter((cls) => new Date(cls.endDatetime) <= now && cls.status !== "cancelled")
-    .sort((a, b) => new Date(b.startDatetime).getTime() - new Date(a.startDatetime).getTime());
+    .filter((cls) => parseClassDatetime(cls.endDatetime) <= now && cls.status !== "cancelled")
+    .sort((a, b) => parseClassDatetime(b.startDatetime).getTime() - parseClassDatetime(a.startDatetime).getTime());
 
   // Cancelled classes (show at bottom of past)
   const cancelledClasses = filtered
     .filter((cls) => cls.status === "cancelled")
-    .sort((a, b) => new Date(b.startDatetime).getTime() - new Date(a.startDatetime).getTime());
+    .sort((a, b) => parseClassDatetime(b.startDatetime).getTime() - parseClassDatetime(a.startDatetime).getTime());
 
   const allPast = [...pastClasses, ...cancelledClasses];
 

@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { format } from "date-fns";
+import { formatClassDateTimeMedium } from "@/lib/dateUtils";
 import {
   CalendarDays,
   Users,
@@ -164,7 +165,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {format(new Date(cls.startDatetime), "MMM d, yyyy · h:mm a")}
+                              {formatClassDateTimeMedium(cls.startDatetime)}
                             </span>
                             {cls.location && (
                               <span className="text-xs text-muted-foreground">

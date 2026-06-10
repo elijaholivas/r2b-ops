@@ -27,15 +27,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import { formatClassDateRange, parseClassDatetime } from "@/lib/dateUtils";
+
 function formatDateRange(start: Date | string, end: Date | string) {
-  const s = new Date(start);
-  const e = new Date(end);
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
-  const timeOpts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12: true };
-  if (s.toDateString() === e.toDateString()) {
-    return `${s.toLocaleDateString(undefined, opts)} · ${s.toLocaleTimeString(undefined, timeOpts)} – ${e.toLocaleTimeString(undefined, timeOpts)}`;
-  }
-  return `${s.toLocaleDateString(undefined, opts)} – ${e.toLocaleDateString(undefined, opts)}`;
+  return formatClassDateRange(start, end);
 }
 
 export default function Archive() {
@@ -184,7 +179,7 @@ export default function Archive() {
                           <AlertDialogTitle>Restore this class?</AlertDialogTitle>
                           <AlertDialogDescription>
                             <strong>{cls.title}</strong> will be moved back to the active classes list.
-                            {new Date(cls.endDatetime) < new Date()
+                            {parseClassDatetime(cls.endDatetime) < new Date()
                               ? " Since the class date has already passed, it will be marked as Completed."
                               : " It will be marked as Upcoming."}
                           </AlertDialogDescription>

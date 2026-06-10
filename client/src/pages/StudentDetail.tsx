@@ -1,6 +1,7 @@
 import { useRoute, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
+import { formatClassDateTimeFull, formatClassDateMedium } from "@/lib/dateUtils";
 import { ArrowLeft, Mail, Phone, CalendarDays, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,7 +112,7 @@ export default function StudentDetail() {
                       <div className="min-w-0">
                         <p className="font-medium text-foreground text-sm">{enr.class?.title ?? "Unknown class"}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {enr.class ? format(new Date(enr.class.startDatetime), "EEE, MMM d, yyyy · h:mm a") : ""}
+                          {enr.class ? formatClassDateTimeFull(enr.class.startDatetime) : ""}
                         </p>
                       </div>
                       <Badge
@@ -143,7 +144,7 @@ export default function StudentDetail() {
                     <div className="min-w-0">
                       <p className="font-medium text-foreground text-sm">{enr.class?.title ?? "Unknown class"}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {enr.class ? format(new Date(enr.class.startDatetime), "EEE, MMM d, yyyy") : ""}
+                        {enr.class ? formatClassDateMedium(enr.class.startDatetime) : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
