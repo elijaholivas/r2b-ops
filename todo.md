@@ -115,6 +115,11 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## V1.17 Features
+- [x] Auto-update class status based on current date (past classes show 'Past' not 'Upcoming')
+- [x] Classes screen: split into two sections — Upcoming (top) and Past (bottom)
+- [x] Sort: upcoming classes ascending by date, past classes descending by date
+
 ## V1.16 Features
 - [x] Auto-archive scheduler: mark classes as archived 8 hours after end time
 - [x] Dashboard and class list: exclude archived classes from default view
