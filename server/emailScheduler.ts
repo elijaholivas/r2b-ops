@@ -15,8 +15,8 @@
 import mysql from "mysql2/promise";
 import { getDb } from "./db";
 import { sendEmailViaMailgun } from "./email";
-import { emailQueue } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { emailQueue, classes } from "../drizzle/schema";
+import { eq, and, lte, notInArray } from "drizzle-orm";
 
 // Raw MySQL connection for queries that Drizzle can't run as prepared statements (e.g. parameterized LIMIT)
 async function getRawConn() {
@@ -193,4 +193,35 @@ export async function scheduleReminderEmails(): Promise<void> {
   }
 
   await rawConn.end();
+}
+
+// ─── Auto-Archive Past Classes ────────────────────────────────────────────────
+// Marks classes as 'archived' once their end time + 8-hour buffer has passed.
+// Only affects classes with status 'upcoming', 'in_progress', or 'completed'.
+
+export async function autoArchiveClasses(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  // Archive threshold: now minus 8 hours (classes whose end time was 8+ hours ago)
+  const archiveThreshold = new Date(Date.now() - 8 * 60 * 60 * 1000);
+
+  try {
+    const result = await db
+      .update(classes)
+      .set({ status: "archived" })
+      .where(
+        and(
+          lte(classes.endDatetime, archiveThreshold),
+          eq(classes.isActive, true),
+          notInArray(classes.status, ["archived", "cancelled"])
+        )
+      );
+    const affected = (result as any)[0]?.affectedRows ?? 0;
+    if (affected > 0) {
+      console.log(`[AutoArchive] Archived ${affected} class(es) past the 8-hour buffer`);
+    }
+  } catch (err: any) {
+    console.error("[AutoArchive] Error archiving classes:", err.message);
+  }
 }

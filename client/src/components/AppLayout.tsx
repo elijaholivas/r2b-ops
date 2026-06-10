@@ -15,6 +15,7 @@ import {
   Shield,
   ChevronRight,
   KeyRound,
+  Archive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/classes", label: "Classes", icon: CalendarDays },
+  { href: "/archive", label: "Archive", icon: Archive, roles: ["super_admin", "admin"] },
   { href: "/students", label: "Students", icon: Users },
   { href: "/admin", label: "Admin", icon: Shield, roles: ["super_admin", "admin"] },
 ];

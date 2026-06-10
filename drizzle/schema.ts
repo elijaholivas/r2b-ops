@@ -61,7 +61,7 @@ export const classes = mysqlTable("classes", {
   startDatetime: timestamp("startDatetime").notNull(),
   endDatetime: timestamp("endDatetime").notNull(),
   capacity: int("capacity").default(20).notNull(),
-  status: mysqlEnum("status", ["upcoming", "in_progress", "completed", "cancelled"]).default("upcoming").notNull(),
+  status: mysqlEnum("status", ["upcoming", "in_progress", "completed", "cancelled", "archived"]).default("upcoming").notNull(),
   wooProductId: varchar("wooProductId", { length: 64 }),
   wooVariationId: varchar("wooVariationId", { length: 64 }),
   price: varchar("price", { length: 20 }),

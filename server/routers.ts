@@ -191,15 +191,21 @@ const classesRouter = router({
       status: z.string().optional(),
       locationId: z.number().optional(),
       upcoming: z.boolean().optional(),
+      includeArchived: z.boolean().optional(),
     }).optional())
     .query(async ({ input, ctx }) => {
       // Instructors only see assigned classes
       if (ctx.user.role === "instructor") {
         const all = await listClasses(input ?? {});
-        // For now return all — class_staff filtering can be added later
         return all;
       }
       return listClasses(input ?? {});
+    }),
+
+  listArchived: protectedProcedure
+    .query(async ({ ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      return listClasses({ status: "archived", includeArchived: true });
     }),
 
   get: protectedProcedure
@@ -249,7 +255,7 @@ const classesRouter = router({
       classType: z.string().optional(),
       locationId: z.number().optional(),
       capacity: z.number().optional(),
-      status: z.enum(["upcoming", "in_progress", "completed", "cancelled"]).optional(),
+      status: z.enum(["upcoming", "in_progress", "completed", "cancelled", "archived"]).optional(),
       price: z.string().optional(),
       wooProductId: z.string().optional(),
       wooVariationId: z.string().optional(),
@@ -306,13 +312,32 @@ const classesRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       requireRole(ctx.user, ADMIN_ROLES);
-      await updateClass(input.id, { isActive: false } as any);
+      await updateClass(input.id, { status: "archived" } as any);
       await logActivity({
         actorUserId: ctx.user.id,
         actionType: "class_updated",
         entityType: "class",
         entityId: input.id,
-        notes: "Class archived",
+        notes: "Class manually archived",
+      });
+      return { success: true };
+    }),
+
+  restore: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      // Restore: set status back to upcoming (or completed if end date already passed)
+      const cls = await getClassById(input.id);
+      if (!cls) throw new TRPCError({ code: "NOT_FOUND", message: "Class not found" });
+      const restoredStatus = new Date(cls.endDatetime) > new Date() ? "upcoming" : "completed";
+      await updateClass(input.id, { status: restoredStatus } as any);
+      await logActivity({
+        actorUserId: ctx.user.id,
+        actionType: "class_updated",
+        entityType: "class",
+        entityId: input.id,
+        notes: `Class restored from archive (status: ${restoredStatus})`,
       });
       return { success: true };
     }),

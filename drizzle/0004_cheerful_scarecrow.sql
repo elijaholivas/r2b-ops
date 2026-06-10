@@ -1,0 +1,1 @@
+ALTER TABLE `classes` MODIFY COLUMN `status` enum('upcoming','in_progress','completed','cancelled','archived') NOT NULL DEFAULT 'upcoming';

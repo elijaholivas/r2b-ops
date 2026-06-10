@@ -12,6 +12,7 @@ import Students from "./pages/Students";
 import StudentDetail from "./pages/StudentDetail";
 import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
+import Archive from "./pages/Archive";
 import AppLayout from "./components/AppLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -71,6 +72,9 @@ function Router() {
       </Route>
       <Route path="/admin">
         {() => <ProtectedRoute component={AdminPanel} roles={["super_admin", "admin"]} />}
+      </Route>
+      <Route path="/archive">
+        {() => <ProtectedRoute component={Archive} roles={["super_admin", "admin"]} />}
       </Route>
       <Route path="/change-password">
         {() => <ProtectedRoute component={ChangePassword} />}

@@ -134,6 +134,7 @@ export async function listClasses(filter?: {
   status?: string;
   locationId?: number;
   upcoming?: boolean;
+  includeArchived?: boolean;
 }): Promise<(Class & { location: Location | null; enrolledCount: number })[]> {
   const db = await getDb();
   if (!db) return [];
@@ -154,6 +155,8 @@ export async function listClasses(filter?: {
 
   return rows
     .filter((c) => {
+      // By default, exclude archived classes unless explicitly requested
+      if (!filter?.includeArchived && c.status === "archived") return false;
       if (filter?.status && c.status !== filter.status) return false;
       if (filter?.locationId && c.locationId !== filter.locationId) return false;
       if (filter?.upcoming && new Date(c.startDatetime) < new Date()) return false;

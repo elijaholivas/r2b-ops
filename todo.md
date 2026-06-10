@@ -115,6 +115,12 @@
 ## Bugs
 - [x] Login redirect loop: fixed — JWT payload format corrected + service worker cache bug resolved
 
+## V1.16 Features
+- [x] Auto-archive scheduler: mark classes as archived 8 hours after end time
+- [x] Dashboard and class list: exclude archived classes from default view
+- [x] Archive tab: view all archived classes with full roster access
+- [x] Admin restore action: un-archive a class back to active
+
 ## V1.15 Features
 - [x] Download and parse class/student data files from Google Drive
 - [x] Import real classes and students into the database (additive, no deletions)
