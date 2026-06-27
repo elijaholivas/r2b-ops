@@ -10,6 +10,7 @@ import {
   UserMinus, ArrowRightLeft, MoreHorizontal, CheckCircle2,
   Pencil, Mail, BellRing, CheckSquare, Square, UserCheck,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,8 @@ export default function ClassDetail() {
   const [removeEnrollment, setRemoveEnrollment] = useState<number | null>(null);
   const [editStudent, setEditStudent] = useState<RosterStudent | null>(null);
   const [checkInMode, setCheckInMode] = useState(false);
+  const [editingCapacity, setEditingCapacity] = useState(false);
+  const [capacityInput, setCapacityInput] = useState("");
 
   const utils = trpc.useUtils();
   const { data: cls, isLoading: clsLoading } = trpc.classes.get.useQuery({ id: classId });
@@ -84,6 +87,21 @@ export default function ClassDetail() {
     onSuccess: (data) => toast.success(`Reminder emails queued for ${data.count} students`),
     onError: (err) => toast.error(err.message),
   });
+
+  const updateCapacity = trpc.classes.updateCapacity.useMutation({
+    onSuccess: (data) => {
+      utils.classes.get.invalidate({ id: classId });
+      setEditingCapacity(false);
+      toast.success(`Capacity updated to ${data.capacity}`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleCapacitySave = () => {
+    const val = parseInt(capacityInput, 10);
+    if (isNaN(val) || val < 1) { toast.error("Enter a valid number (minimum 1)"); return; }
+    updateCapacity.mutate({ id: classId, capacity: val });
+  };
 
   const handleExportCsv = async () => {
     const result = await fetchCsv();
@@ -154,10 +172,43 @@ export default function ClassDetail() {
           {/* Capacity + Check-in stats */}
           <div className="space-y-1">
             <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground font-medium">{cls.enrolledCount} / {cls.capacity} enrolled</span>
-                {isFull && <Badge className="bg-red-900/40 text-red-400 border-red-700/50 text-xs">Full</Badge>}
+                {editingCapacity ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-foreground font-medium">{cls.enrolledCount} /</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={capacityInput}
+                      onChange={(e) => setCapacityInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleCapacitySave(); if (e.key === "Escape") setEditingCapacity(false); }}
+                      className="w-20 h-7 text-sm bg-input border-border text-foreground px-2 py-0"
+                      autoFocus
+                    />
+                    <Button size="sm" className="h-7 px-2 text-xs bg-primary hover:bg-primary/90" onClick={handleCapacitySave} disabled={updateCapacity.isPending}>
+                      Save
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => setEditingCapacity(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-foreground font-medium">{cls.enrolledCount} / {cls.capacity} enrolled</span>
+                    {isFull && <Badge className="bg-red-900/40 text-red-400 border-red-700/50 text-xs">Full</Badge>}
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setCapacityInput(String(cls.capacity)); setEditingCapacity(true); }}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="Edit capacity"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <UserCheck className="h-3.5 w-3.5" />

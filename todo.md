@@ -190,3 +190,7 @@
 - [x] Created dateUtils.ts with parseClassDatetime() that re-interprets UTC wall-clock values as the intended local time
 - [x] Updated all date display: Classes, ClassDetail, Dashboard, Archive, MoveStudentModal, StudentDetail, CCWRenewalsTab
 - [x] 10 new Vitest tests for dateUtils (26 total, all passing)
+
+## V1.19 Features
+- [x] Edit capacity inline on Class Detail — admins see a pencil icon next to the seat count; tap to enter a new number, Save/Cancel, Enter/Escape keyboard shortcuts
+- [x] classes.updateCapacity tRPC mutation — validates 1–500, logs old/new values to activity log

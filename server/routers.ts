@@ -341,6 +341,28 @@ const classesRouter = router({
       });
       return { success: true };
     }),
+
+  updateCapacity: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      capacity: z.number().int().min(1, "Capacity must be at least 1").max(500, "Capacity cannot exceed 500"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      requireRole(ctx.user, ADMIN_ROLES);
+      const cls = await getClassById(input.id);
+      if (!cls) throw new TRPCError({ code: "NOT_FOUND", message: "Class not found" });
+      await updateClass(input.id, { capacity: input.capacity } as any);
+      await logActivity({
+        actorUserId: ctx.user.id,
+        actionType: "class_updated",
+        entityType: "class",
+        entityId: input.id,
+        oldValues: { capacity: cls.capacity },
+        newValues: { capacity: input.capacity },
+        notes: `Capacity updated from ${cls.capacity} to ${input.capacity}`,
+      });
+      return { success: true, capacity: input.capacity };
+    }),
 });
 
 // ─── Enrollments Router ───────────────────────────────────────────────────────
