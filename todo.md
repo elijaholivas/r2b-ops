@@ -194,3 +194,12 @@
 ## V1.19 Features
 - [x] Edit capacity inline on Class Detail — admins see a pencil icon next to the seat count; tap to enter a new number, Save/Cancel, Enter/Escape keyboard shortcuts
 - [x] classes.updateCapacity tRPC mutation — validates 1–500, logs old/new values to activity log
+
+## V1.20 Features
+- [x] WooCommerce auto-sync handler at /api/scheduled/woo-sync (Heartbeat cron endpoint)
+- [x] SDK patches: AuthenticatedUser type, CRON_OPEN_ID_PREFIX, buildCronUser — cron identity support in authenticateRequest
+- [x] manusTypes.ts: added taskUid field to GetUserInfoWithJwtResponse
+- [x] Extracted runWooSync() into server/wooSync.ts — shared by manual tRPC mutation and scheduled handler
+- [x] Handler sends owner notification when new classes are created
+- [x] Handler returns 200 (not 500) when WooCommerce credentials are not yet configured — prevents unnecessary retries
+- [ ] Register 6-hour Heartbeat cron (requires site to be deployed first — see instructions below)

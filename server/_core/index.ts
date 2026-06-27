@@ -99,6 +99,54 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 
+  // ─── Scheduled: WooCommerce auto-sync (Heartbeat cron) ────────────────────
+  app.post("/api/scheduled/woo-sync", async (req, res) => {
+    try {
+      const { sdk } = await import("./sdk");
+      const user = await sdk.authenticateRequest(req);
+      if (!(user as any).isCron) {
+        return res.status(403).json({ error: "cron-only" });
+      }
+
+      const { runWooSync } = await import("../wooSync");
+      const { getIntegrationSettings } = await import("../db");
+      const settings = await getIntegrationSettings();
+
+      if (!settings?.wooBaseUrl || !settings?.wooConsumerKey || !settings?.wooConsumerSecret) {
+        // Credentials not configured — return 200 so the platform doesn't retry
+        console.log("[WooSync] Skipped: WooCommerce credentials not configured");
+        return res.json({ ok: true, skipped: "credentials-not-configured", created: 0, total: 0 });
+      }
+
+      const summary = await runWooSync();
+      console.log(`[WooSync] Auto-sync complete: ${summary.created} created, ${summary.skipped} skipped`);
+
+      // Notify owner if new classes were created
+      if (summary.created > 0) {
+        try {
+          const { notifyOwner } = await import("./notification");
+          await notifyOwner({
+            title: `WooCommerce Auto-Sync: ${summary.created} new class${summary.created !== 1 ? "es" : ""} added`,
+            content: summary.results
+              .filter((r) => r.action === "created")
+              .map((r) => `• ${r.name}${r.variationName ? ` (${r.variationName})` : ""}`)
+              .join("\n"),
+          });
+        } catch (_) { /* notification failure is non-fatal */ }
+      }
+
+      res.json({ ok: true, ...summary });
+    } catch (err: any) {
+      console.error("[WooSync] Scheduled sync error:", err.message, err.stack);
+      res.status(500).json({
+        error: err.message,
+        stack: err.stack,
+        context: { url: req.url },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

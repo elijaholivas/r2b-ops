@@ -47,6 +47,7 @@ import {
   markCcwRenewalSent,
 } from "./db";
 import { renderTemplate, sendEmailViaMailgun } from "./email";
+import { runWooSync } from "./wooSync";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 
@@ -902,6 +903,19 @@ const adminRouter = router({
         code: "BAD_REQUEST",
         message: "WooCommerce credentials are not configured. Please set Store URL, Consumer Key, and Consumer Secret in Settings.",
       });
+    }
+    try {
+      return await runWooSync();
+    } catch (err: any) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message ?? "Sync failed" });
+    }
+  }),
+  // ─── DEAD CODE BELOW (replaced by runWooSync) — kept for reference until next cleanup ───
+  _syncWooProductsOld: protectedProcedure.mutation(async ({ ctx }) => {
+    requireRole(ctx.user, ["super_admin"]);
+    const settings = await getIntegrationSettings();
+    if (!settings?.wooBaseUrl || !settings?.wooConsumerKey || !settings?.wooConsumerSecret) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "WooCommerce credentials are not configured." });
     }
 
     const baseUrl = settings.wooBaseUrl.replace(/\/$/, "");
