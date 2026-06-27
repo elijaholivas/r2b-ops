@@ -203,3 +203,8 @@
 - [x] Handler sends owner notification when new classes are created
 - [x] Handler returns 200 (not 500) when WooCommerce credentials are not yet configured — prevents unnecessary retries
 - [ ] Register 6-hour Heartbeat cron (requires site to be deployed first — see instructions below)
+
+## V1.21 Features
+- [x] Remove 20-seat hard cap: allow capacity to be set to any positive number in the inline editor on Class Detail
+- [x] Fix enrollment guard: if enrolled count already exceeds capacity (Wix imports), allow adding students up to the new capacity
+- [x] Update updateCapacity server validation to accept any positive integer (remove max:20 if present)

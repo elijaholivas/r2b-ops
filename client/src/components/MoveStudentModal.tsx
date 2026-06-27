@@ -33,7 +33,7 @@ export default function MoveStudentModal({ open, enrollmentId, currentClassId, o
   const { data: classes } = trpc.classes.list.useQuery({});
 
   const availableClasses = (classes ?? []).filter(
-    (c) => c.id !== currentClassId && c.status === "upcoming" && c.enrolledCount < c.capacity
+    (c) => c.id !== currentClassId && c.status === "upcoming"
   );
 
   const moveMutation = trpc.enrollments.move.useMutation({
@@ -95,7 +95,7 @@ export default function MoveStudentModal({ open, enrollmentId, currentClassId, o
                         <div className="flex flex-col">
                           <span className="font-medium text-foreground">{cls.title}</span>
                           <span className="text-xs text-muted-foreground">
-                            {formatClassDateMedium(cls.startDatetime)} · {cls.capacity - cls.enrolledCount} seats open
+                            {formatClassDateMedium(cls.startDatetime)} · {cls.enrolledCount < cls.capacity ? `${cls.capacity - cls.enrolledCount} seats open` : "Full"}
                           </span>
                         </div>
                       </SelectItem>
@@ -114,9 +114,15 @@ export default function MoveStudentModal({ open, enrollmentId, currentClassId, o
                     <p className="text-xs text-muted-foreground">{selectedClass.location.name}</p>
                   )}
                   <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="outline" className="text-xs bg-green-900/40 text-green-300 border-green-700/50">
-                      {selectedClass.capacity - selectedClass.enrolledCount} seats available
-                    </Badge>
+                    {selectedClass.enrolledCount < selectedClass.capacity ? (
+                      <Badge variant="outline" className="text-xs bg-green-900/40 text-green-300 border-green-700/50">
+                        {selectedClass.capacity - selectedClass.enrolledCount} seats available
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs bg-red-900/40 text-red-300 border-red-700/50">
+                        Full ({selectedClass.enrolledCount}/{selectedClass.capacity}) — increase capacity first
+                      </Badge>
+                    )}
                   </div>
                 </div>
               )}

@@ -180,7 +180,6 @@ export default function ClassDetail() {
                     <Input
                       type="number"
                       min={1}
-                      max={500}
                       value={capacityInput}
                       onChange={(e) => setCapacityInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") handleCapacitySave(); if (e.key === "Escape") setEditingCapacity(false); }}

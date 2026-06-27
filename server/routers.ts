@@ -346,7 +346,7 @@ const classesRouter = router({
   updateCapacity: protectedProcedure
     .input(z.object({
       id: z.number(),
-      capacity: z.number().int().min(1, "Capacity must be at least 1").max(500, "Capacity cannot exceed 500"),
+      capacity: z.number().int().min(1, "Capacity must be at least 1"),
     }))
     .mutation(async ({ input, ctx }) => {
       requireRole(ctx.user, ADMIN_ROLES);
@@ -391,7 +391,12 @@ const enrollmentsRouter = router({
 
       const cls = await getClassById(input.classId);
       if (!cls) throw new TRPCError({ code: "NOT_FOUND", message: "Class not found" });
-      if (cls.enrolledCount >= cls.capacity) {
+      if (cls.enrolledCount > cls.capacity) {
+        // enrolledCount already exceeds capacity (e.g. Wix import overflow).
+        // Admins should increase capacity via the Edit Capacity button first.
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Class is over capacity (${cls.enrolledCount}/${cls.capacity}). Please increase the capacity before adding more students.` });
+      }
+      if (cls.enrolledCount === cls.capacity) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Class is full" });
       }
 
