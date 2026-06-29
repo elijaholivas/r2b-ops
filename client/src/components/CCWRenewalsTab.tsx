@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { format, formatDistanceToNow } from "date-fns";
 import { formatClassDateMedium } from "@/lib/dateUtils";
@@ -5,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { RefreshCw, Mail, Clock, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
+import { RefreshCw, Mail, Clock, CheckCircle2, AlertCircle, Calendar, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_PILL: Record<string, string> = {
@@ -22,8 +23,13 @@ const STATUS_LABEL: Record<string, string> = {
   converted: "Renewed",
 };
 
+type StatusFilter = "all" | "pending" | "sent" | "cancelled";
+
 export default function CCWRenewalsTab() {
-  const { data: renewals, isLoading, refetch } = trpc.ccwRenewals.list.useQuery({});
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+  const { data: renewals, isLoading, refetch } = trpc.ccwRenewals.list.useQuery(
+    statusFilter === "all" ? {} : { status: statusFilter as "pending" | "sent" | "cancelled" }
+  );
   const { data: stats } = trpc.ccwRenewals.stats.useQuery();
 
   const sendNow = trpc.ccwRenewals.sendNow.useMutation({
@@ -69,6 +75,26 @@ export default function CCWRenewalsTab() {
         </div>
       )}
 
+      {/* Status Filter */}
+      <div className="flex gap-1.5 flex-wrap">
+        {(["pending", "sent", "all", "cancelled"] as StatusFilter[]).map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={statusFilter === s ? "default" : "outline"}
+            onClick={() => setStatusFilter(s)}
+            className={cn(
+              "h-7 text-xs capitalize",
+              statusFilter === s
+                ? "bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+          </Button>
+        ))}
+      </div>
+
       {/* Actions */}
       <div className="flex items-center justify-between">
         <div>
@@ -110,9 +136,13 @@ export default function CCWRenewalsTab() {
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{r.student.email}</p>
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 text-foreground/70 font-medium">
+                    <BookOpen className="h-3 w-3" />
+                    {r.class.title ?? "Class"}
+                  </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Took class: {formatClassDateMedium(r.class.startDatetime)}
+                    {formatClassDateMedium(r.class.startDatetime)}
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />

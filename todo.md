@@ -216,3 +216,7 @@
 - [x] scheduleRenewalReminders() added to emailScheduler.ts: queries getDueCcwRenewals(), queues branded HTML email with booking CTA, marks reminder as sent
 - [x] scheduleRenewalReminders() wired into the 15-min cron in server/_core/index.ts
 - [x] 26/26 tests passing, 0 TypeScript errors
+
+## V1.23 Features
+- [x] Admin Settings: CCW Renewal Product URL field already built in SettingsTab — shows current URL, allows update, saves to integrationSettings.ccwRenewalProductUrl
+- [x] CCW Renewals tab in Admin: fully built (CCWRenewalsTab.tsx) with stats row (total/pending/sent/due this month), per-reminder rows with student name, email, class date, scheduled send date, status badge, Send Now and Cancel actions, Process Now button
