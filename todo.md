@@ -202,9 +202,17 @@
 - [x] Extracted runWooSync() into server/wooSync.ts — shared by manual tRPC mutation and scheduled handler
 - [x] Handler sends owner notification when new classes are created
 - [x] Handler returns 200 (not 500) when WooCommerce credentials are not yet configured — prevents unnecessary retries
-- [ ] Register 6-hour Heartbeat cron (requires site to be deployed first — see instructions below)
+- [x] Register 6-hour Heartbeat cron — active, fires at 00:00/06:00/12:00/18:00 UTC, taskUid: zBFTZucCmDCpJM4e1l2zoD
 
 ## V1.21 Features
 - [x] Remove 20-seat hard cap: allow capacity to be set to any positive number in the inline editor on Class Detail
 - [x] Fix enrollment guard: if enrolled count already exceeds capacity (Wix imports), allow adding students up to the new capacity
 - [x] Update updateCapacity server validation to accept any positive integer (remove max:20 if present)
+
+## V1.22 Features
+- [x] ccwRenewalReminders table confirmed in DB (scheduledFor, status, enrollmentId, studentId, classId)
+- [x] checkIn procedure: when attended=true and class title/type matches Initial or Re-Cert, calls scheduleCcwRenewal() to insert a pending reminder 18 months after class date
+- [x] bulkCheckIn procedure: same logic applied to all checked-in students in the class
+- [x] scheduleRenewalReminders() added to emailScheduler.ts: queries getDueCcwRenewals(), queues branded HTML email with booking CTA, marks reminder as sent
+- [x] scheduleRenewalReminders() wired into the 15-min cron in server/_core/index.ts
+- [x] 26/26 tests passing, 0 TypeScript errors

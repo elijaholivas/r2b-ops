@@ -1,10 +1,12 @@
 /**
  * emailScheduler.ts
  *
- * Two responsibilities:
- *   1. processEmailQueue()      — picks up pending/retry-eligible emails and sends via Mailgun
- *   2. scheduleReminderEmails() — finds enrollments whose class starts in ~48 hours and queues
+ * Three responsibilities:
+ *   1. processEmailQueue()        — picks up pending/retry-eligible emails and sends via Mailgun
+ *   2. scheduleReminderEmails()   — finds enrollments whose class starts in ~48 hours and queues
  *      a reminder email if one hasn't been sent yet
+ *   3. scheduleRenewalReminders() — finds due CCW renewal reminders (18 months after check-in)
+ *      and queues renewal reminder emails
  *
  * Called by server/_core/index.ts on a 15-minute interval.
  *
@@ -13,7 +15,7 @@
  */
 
 import mysql from "mysql2/promise";
-import { getDb } from "./db";
+import { getDb, getDueCcwRenewals, markCcwRenewalSent, queueEmail, getIntegrationSettings } from "./db";
 import { sendEmailViaMailgun } from "./email";
 import { emailQueue, classes } from "../drizzle/schema";
 import { eq, and, lte, notInArray } from "drizzle-orm";
@@ -193,6 +195,71 @@ export async function scheduleReminderEmails(): Promise<void> {
   }
 
   await rawConn.end();
+}
+
+// ─── Schedule CCW Renewal Reminder Emails ────────────────────────────────────
+// Finds ccwRenewalReminders rows that are due (scheduledFor <= now, status=pending)
+// and queues a renewal reminder email for each one.
+
+export async function scheduleRenewalReminders(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const due = await getDueCcwRenewals();
+  if (due.length === 0) return;
+
+  const settings = await getIntegrationSettings();
+  const renewalUrl = settings?.ccwRenewalProductUrl ?? "https://r2bear.com";
+
+  for (const item of due) {
+    try {
+      const classDate = new Date(item.class.startDatetime).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC",
+      });
+
+      const bodyHtml = `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <div style="background: #1a1a1a; padding: 24px; text-align: center;">
+    <h1 style="color: #c0392b; margin: 0;">Right 2 Bear</h1>
+    <p style="color: #ffffff; margin: 4px 0 0;">CCW Renewal Reminder</p>
+  </div>
+  <div style="padding: 24px; background: #ffffff;">
+    <p>Hi ${item.student.firstName},</p>
+    <p>It's been <strong>18 months</strong> since you completed your CCW class on <strong>${classDate}</strong>.</p>
+    <p>Your California CCW permit requires renewal — don't let it lapse! We'd love to see you back at Right 2 Bear for your Re-Certification class.</p>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${renewalUrl}" style="background: #c0392b; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Book Your Renewal Class</a>
+    </div>
+    <p>Questions? Email us at <a href="mailto:info@r2bear.com">info@r2bear.com</a> or call us anytime.</p>
+    <p>See you soon!</p>
+    <p>— The Right 2 Bear Team</p>
+  </div>
+  <div style="background: #f5f5f5; padding: 12px 24px; text-align: center; font-size: 12px; color: #666;">
+    <p style="margin: 0;">You are receiving this because you attended a CCW class with Right 2 Bear.</p>
+  </div>
+</div>`;
+
+      const emailQueueId = await queueEmail({
+        enrollmentId: item.enrollmentId,
+        classId: item.classId,
+        studentId: item.studentId,
+        toEmail: item.student.email,
+        toName: `${item.student.firstName} ${item.student.lastName}`,
+        templateKey: "ccw_renewal",
+        subject: "Time to Renew Your CCW — Right 2 Bear",
+        bodyHtml,
+        scheduledFor: new Date(),
+      });
+
+      await markCcwRenewalSent(item.id, emailQueueId);
+      console.log(`[RenewalReminder] Queued renewal email for student ${item.studentId} (${item.student.email})`);
+    } catch (err: any) {
+      console.error(`[RenewalReminder] Failed to queue renewal for reminder ${item.id}:`, err.message);
+    }
+  }
 }
 
 // ─── Auto-Archive Past Classes ────────────────────────────────────────────────

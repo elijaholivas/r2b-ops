@@ -629,6 +629,15 @@ export async function listCcwRenewalReminders(filter?: { status?: "pending" | "s
   }));
 }
 
+export async function cancelCcwRenewal(enrollmentId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(ccwRenewalReminders)
+    .set({ status: "cancelled" })
+    .where(and(eq(ccwRenewalReminders.enrollmentId, enrollmentId), eq(ccwRenewalReminders.status, "pending")));
+}
+
 export async function markCcwRenewalSent(id: number, emailQueueId?: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

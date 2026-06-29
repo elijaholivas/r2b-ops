@@ -43,6 +43,7 @@ import {
   checkInEnrollment,
   bulkCheckIn,
   scheduleCcwRenewal,
+  cancelCcwRenewal,
   listCcwRenewalReminders,
   markCcwRenewalSent,
 } from "./db";
@@ -616,6 +617,44 @@ const enrollmentsRouter = router({
     .mutation(async ({ input, ctx }) => {
       requireRole(ctx.user, STAFF_ROLES);
       await checkInEnrollment(input.enrollmentId, input.attended);
+
+      // Cancel pending CCW renewal reminder when attendance is toggled off
+      if (!input.attended) {
+        try {
+          await cancelCcwRenewal(input.enrollmentId);
+        } catch (err: any) {
+          console.error("[CheckIn] Failed to cancel CCW renewal reminder:", err.message);
+        }
+      }
+
+      // Schedule 18-month CCW renewal reminder when student is marked as attended
+      if (input.attended) {
+        try {
+          const enrollment = await getEnrollmentById(input.enrollmentId);
+          if (enrollment?.classId) {
+            const cls = await getClassById(enrollment.classId);
+            // Only schedule for Initial and Re-Certification class types
+            const renewalClassTypes = ["initial", "recertification", "re-certification", "re_certification", "renewal"];
+            const isRenewalClass = cls && (
+              renewalClassTypes.some(t => (cls.classType ?? "").toLowerCase().includes(t)) ||
+              renewalClassTypes.some(t => (cls.title ?? "").toLowerCase().includes(t))
+            );
+            if (isRenewalClass && cls) {
+              // Use current time (actual check-in moment) as the 18-month countdown start
+              await scheduleCcwRenewal(
+                input.enrollmentId,
+                enrollment.studentId!,
+                enrollment.classId,
+                new Date() // countdown starts from actual check-in time
+              );
+            }
+          }
+        } catch (err: any) {
+          // Non-fatal: log but don't fail the check-in
+          console.error("[CheckIn] Failed to schedule CCW renewal reminder:", err.message);
+        }
+      }
+
       return { success: true };
     }),
 
@@ -625,6 +664,25 @@ const enrollmentsRouter = router({
       requireRole(ctx.user, STAFF_ROLES);
       const count = await bulkCheckIn(input.classId);
       await logActivity({ actorUserId: ctx.user.id, actionType: "bulk_checkin", entityType: "class", entityId: input.classId, notes: `Bulk checked in ${count} students` });
+
+      // Schedule 18-month CCW renewal reminders for all checked-in students
+      try {
+        const cls = await getClassById(input.classId);
+        const renewalClassTypes = ["initial", "recertification", "re-certification", "re_certification", "renewal"];
+        const isRenewalClass = cls && (
+          renewalClassTypes.some(t => (cls.classType ?? "").toLowerCase().includes(t)) ||
+          renewalClassTypes.some(t => (cls.title ?? "").toLowerCase().includes(t))
+        );
+        if (isRenewalClass && cls) {
+          const enrollmentRows = await getEnrollmentsForClass(input.classId);
+          for (const enr of enrollmentRows.filter(e => e.checkedInAt)) {
+            await scheduleCcwRenewal(enr.id, enr.student.id, input.classId, cls.startDatetime).catch(() => {});
+          }
+        }
+      } catch (err: any) {
+        console.error("[BulkCheckIn] Failed to schedule CCW renewal reminders:", err.message);
+      }
+
       return { success: true, count };
     }),
 
