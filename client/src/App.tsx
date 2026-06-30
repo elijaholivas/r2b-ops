@@ -14,6 +14,7 @@ import AdminPanel from "./pages/AdminPanel";
 import ChangePassword from "./pages/ChangePassword";
 import Archive from "./pages/Archive";
 import AppLayout from "./components/AppLayout";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
@@ -92,6 +93,7 @@ function App() {
         <TooltipProvider>
           <Toaster theme="dark" position="top-right" />
           <Router />
+          <PWAInstallPrompt />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

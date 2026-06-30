@@ -220,3 +220,11 @@
 ## V1.23 Features
 - [x] Admin Settings: CCW Renewal Product URL field already built in SettingsTab — shows current URL, allows update, saves to integrationSettings.ccwRenewalProductUrl
 - [x] CCW Renewals tab in Admin: fully built (CCWRenewalsTab.tsx) with stats row (total/pending/sent/due this month), per-reminder rows with student name, email, class date, scheduled send date, status badge, Send Now and Cancel actions, Process Now button
+
+## V1.24 Features
+- [x] vite-plugin-pwa not needed — manifest and service worker already hand-crafted (sw.js v3)
+- [x] Generated PWA icons: icon-192.png, icon-512.png, apple-touch-icon.png (180x180) — dark bg + R2B red circle + bold white text
+- [x] manifest.json updated: scope, apple-touch-icon entry, separate any/maskable purpose entries
+- [x] index.html updated: apple-touch-icon link, icon-192/512 link tags
+- [x] PWAInstallPrompt.tsx component: shows Android Chrome install banner, dismissed permanently via localStorage
+- [x] PWAInstallPrompt wired into App.tsx
