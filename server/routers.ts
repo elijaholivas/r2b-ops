@@ -510,6 +510,16 @@ const enrollmentsRouter = router({
         }
       }
 
+      // Fire push notification to all subscribed staff (non-blocking)
+      import("./pushNotifications").then(({ sendPushToAllAdmins }) => {
+        sendPushToAllAdmins({
+          title: "New Enrollment 🎯",
+          body: `${input.firstName} ${input.lastName} added to ${cls.title}`,
+          icon: "/icon-192.png",
+          url: `/classes/${input.classId}`,
+        }).catch(() => {}); // silent fail
+      }).catch(() => {});
+
       return { success: true, enrollmentId, studentId: student!.id };
     }),
 
@@ -1351,6 +1361,33 @@ const webhookRouter = router({
 
 // ─── App Router ───────────────────────────────────────────────────────────────
 
+const pushRouter = router({
+  getPublicKey: protectedProcedure.query(() => {
+    const { getVapidPublicKey } = require("./pushNotifications");
+    return { publicKey: getVapidPublicKey() };
+  }),
+
+  subscribe: protectedProcedure
+    .input(z.object({
+      endpoint: z.string(),
+      keys: z.object({ p256dh: z.string(), auth: z.string() }),
+      userAgent: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { saveSubscription } = await import("./pushNotifications");
+      await saveSubscription(ctx.user.id, { endpoint: input.endpoint, keys: input.keys }, input.userAgent);
+      return { success: true };
+    }),
+
+  unsubscribe: protectedProcedure
+    .input(z.object({ endpoint: z.string() }))
+    .mutation(async ({ input }) => {
+      const { removeSubscription } = await import("./pushNotifications");
+      await removeSubscription(input.endpoint);
+      return { success: true };
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: authRouter,
@@ -1360,6 +1397,7 @@ export const appRouter = router({
   admin: adminRouter,
   webhooks: webhookRouter,
   ccwRenewals: ccwRenewalsRouter,
+  push: pushRouter,
 });
 
 export type AppRouter = typeof appRouter;

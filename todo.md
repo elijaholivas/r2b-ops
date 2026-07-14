@@ -234,3 +234,14 @@
 - [x] Frontend: useEnrollmentChime hook — polls every 30s, plays Web Audio API chime (E5 + G#5 two-note ding) + shows sonner toast with student name and class title
 - [x] No external audio file — chime synthesized in-browser using Web Audio API oscillators
 - [x] EnrollmentChimeProvider wired into App.tsx — runs on all pages when logged in, silent fail if audio blocked
+
+## V1.26 Features
+- [x] VAPID keys generated and stored as VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY secrets
+- [x] pushSubscriptions table added to schema and migrated to live DB (endpoint, p256dh, auth, userId, userAgent)
+- [x] tRPC push router: getPublicKey, subscribe, unsubscribe
+- [x] server/pushNotifications.ts: saveSubscription, removeSubscription, sendPushToAllAdmins (auto-removes stale 410 subs)
+- [x] sw.js updated: push event handler shows notification with icon/badge/vibrate/actions; notificationclick opens class page
+- [x] sendPushToAllAdmins wired into enrollments.add mutation (non-blocking, silent fail)
+- [x] usePushNotifications hook: permission request, subscribe/unsubscribe, stale sub cleanup
+- [x] PushNotificationToggle component: bell icon in mobile top bar (green BellRing when subscribed)
+- [x] 26/26 tests passing, 0 TypeScript errors
