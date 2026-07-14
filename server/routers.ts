@@ -376,6 +376,39 @@ const enrollmentsRouter = router({
       return getEnrollmentsForClass(input.classId);
     }),
 
+  recent: protectedProcedure
+    .input(z.object({ since: z.number() })) // Unix ms timestamp
+    .query(async ({ input }) => {
+      const { getDb } = await import("./db");
+      const { enrollments, students, classes } = await import("../drizzle/schema");
+      const { gt, desc } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+      const sinceDate = new Date(input.since);
+      const rows = await db
+        .select({
+          id: enrollments.id,
+          createdAt: enrollments.createdAt,
+          classId: enrollments.classId,
+          classTitle: classes.title,
+          firstName: students.firstName,
+          lastName: students.lastName,
+        })
+        .from(enrollments)
+        .innerJoin(students, (await import("drizzle-orm")).eq(students.id, enrollments.studentId))
+        .innerJoin(classes, (await import("drizzle-orm")).eq(classes.id, enrollments.classId))
+        .where(gt(enrollments.createdAt, sinceDate))
+        .orderBy(desc(enrollments.createdAt))
+        .limit(20);
+      return rows.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt ? new Date(r.createdAt).getTime() : Date.now(),
+        classId: r.classId,
+        classTitle: r.classTitle,
+        studentName: `${r.firstName} ${r.lastName}`,
+      }));
+    }),
+
   add: protectedProcedure
     .input(z.object({
       classId: z.number(),

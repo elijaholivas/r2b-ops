@@ -228,3 +228,9 @@
 - [x] index.html updated: apple-touch-icon link, icon-192/512 link tags
 - [x] PWAInstallPrompt.tsx component: shows Android Chrome install banner, dismissed permanently via localStorage
 - [x] PWAInstallPrompt wired into App.tsx
+
+## V1.25 Features
+- [x] Backend: trpc.enrollments.recent query — returns enrollments created after a given timestamp with student name + class title
+- [x] Frontend: useEnrollmentChime hook — polls every 30s, plays Web Audio API chime (E5 + G#5 two-note ding) + shows sonner toast with student name and class title
+- [x] No external audio file — chime synthesized in-browser using Web Audio API oscillators
+- [x] EnrollmentChimeProvider wired into App.tsx — runs on all pages when logged in, silent fail if audio blocked

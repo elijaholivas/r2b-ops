@@ -17,6 +17,13 @@ import AppLayout from "./components/AppLayout";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { useEnrollmentChime } from "./hooks/useEnrollmentChime";
+
+function EnrollmentChimeProvider() {
+  const { user } = useAuth();
+  useEnrollmentChime(!!user);
+  return null;
+}
 
 function ProtectedRoute({ component: Component, roles }: { component: React.ComponentType; roles?: string[] }) {
   const { user, loading } = useAuth();
@@ -92,6 +99,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster theme="dark" position="top-right" />
+          <EnrollmentChimeProvider />
           <Router />
           <PWAInstallPrompt />
         </TooltipProvider>

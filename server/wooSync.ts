@@ -115,7 +115,7 @@ export async function runWooSync(): Promise<SyncSummary> {
 
   // Fetch up to 100 published products
   const url = `${baseUrl}/wp-json/wc/v3/products?per_page=100&status=publish`;
-  const response = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
+  const response = await fetch(url, { headers: { Authorization: `Basic ${auth}`, Accept: "application/json" } });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`WooCommerce API error ${response.status}: ${text.slice(0, 200)}`);
@@ -157,7 +157,7 @@ export async function runWooSync(): Promise<SyncSummary> {
     if (product.type === "variable" && product.variations?.length > 0) {
       try {
         const varUrl = `${baseUrl}/wp-json/wc/v3/products/${product.id}/variations?per_page=100`;
-        const varRes = await fetch(varUrl, { headers: { Authorization: `Basic ${auth}` } });
+        const varRes = await fetch(varUrl, { headers: { Authorization: `Basic ${auth}`, Accept: "application/json" } });
         if (varRes.ok) {
           const variations: any[] = await varRes.json();
           for (const v of variations) {
