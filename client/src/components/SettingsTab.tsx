@@ -183,7 +183,7 @@ export function SettingsTab() {
               <Label className="text-sm text-foreground">Sending Domain</Label>
               <Input
                 type="text"
-                placeholder={settings?.mailgunDomain ?? "mail.r2bear.com"}
+                placeholder={settings?.mailgunDomain ?? "r2bear.com"}
                 value={mailgunDomain}
                 onChange={(e) => setMailgunDomain(e.target.value)}
                 className="bg-secondary border-border text-foreground placeholder:text-muted-foreground font-mono text-sm"
@@ -193,7 +193,7 @@ export function SettingsTab() {
           </div>
           <div className="p-3 rounded-lg bg-secondary/50 border border-border">
             <p className="text-xs text-muted-foreground">
-              Sender address: <span className="text-foreground font-mono">info@mail.r2bear.com</span>
+              Sender address: <span className="text-foreground font-mono">reminder@r2bear.com</span>
               {" · "}All confirmation and reminder emails will be sent from this address.
             </p>
           </div>

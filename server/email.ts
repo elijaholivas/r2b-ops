@@ -1,7 +1,8 @@
 import { getIntegrationSettings, updateEmailStatus } from "./db";
 
-const FROM_EMAIL = "info@mail.r2bear.com";
+const FROM_EMAIL = "reminder@r2bear.com";
 const FROM_NAME = "Right 2 Bear";
+const DEFAULT_DOMAIN = "r2bear.com";
 
 export function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
@@ -16,14 +17,16 @@ export async function sendEmailViaMailgun(params: {
 }): Promise<{ success: boolean; error?: string }> {
   const settings = await getIntegrationSettings();
   const apiKey = settings?.mailgunApiKey || process.env.MAILGUN_API_KEY;
-  const domain = settings?.mailgunDomain || "mail.r2bear.com";
+  const domain = settings?.mailgunDomain || DEFAULT_DOMAIN;
+  const fromEmail = settings?.defaultFromEmail || FROM_EMAIL;
+  const fromName = FROM_NAME;
 
   if (!apiKey) {
     return { success: false, error: "Mailgun API key not configured" };
   }
 
   const formData = new URLSearchParams();
-  formData.append("from", `${FROM_NAME} <${FROM_EMAIL}>`);
+  formData.append("from", `${fromName} <${fromEmail}>`);
   formData.append("to", params.toName ? `${params.toName} <${params.to}>` : params.to);
   formData.append("subject", params.subject);
   formData.append("html", params.html);

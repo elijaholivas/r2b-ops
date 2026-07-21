@@ -245,3 +245,12 @@
 - [x] usePushNotifications hook: permission request, subscribe/unsubscribe, stale sub cleanup
 - [x] PushNotificationToggle component: bell icon in mobile top bar (green BellRing when subscribed)
 - [x] 26/26 tests passing, 0 TypeScript errors
+
+## V1.27 Features
+- [x] Update email From address from info@mail.r2bear.com to reminder@r2bear.com
+- [x] Update default Mailgun sending domain from mail.r2bear.com to r2bear.com
+- [x] MAILGUN_API_KEY stored as environment secret (cdbb32fe... key)
+- [x] DB integrationSettings updated: mailgunDomain=r2bear.com, defaultFromEmail=reminder@r2bear.com
+- [x] SettingsTab UI updated: placeholder domain shows r2bear.com, sender address shows reminder@r2bear.com
+- [x] email.ts: respects defaultFromEmail from DB settings (falls back to reminder@r2bear.com)
+- [x] 26/26 tests passing, 0 TypeScript errors
