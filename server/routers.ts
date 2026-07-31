@@ -50,6 +50,7 @@ import {
 import { renderTemplate, sendEmailViaMailgun } from "./email";
 import { runWooSync } from "./wooSync";
 import { formatClassDateLong, formatClassTime } from "./dateUtils";
+import { buildClassEmailHtml } from "./emailTemplates";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 
@@ -485,30 +486,24 @@ const enrollmentsRouter = router({
 
       // Queue confirmation email
       if (input.sendConfirmation) {
-        const template = await getEmailTemplate("confirmation");
-        if (template) {
-          const vars = {
-            studentName: `${input.firstName} ${input.lastName}`,
-            className: cls.title,
-            classDate: formatClassDateLong(cls.startDatetime),
-            classTime: formatClassTime(cls.startDatetime),
-            classLocation: cls.location?.name ?? "TBD",
-          };
-          const bodyHtml = renderTemplate(template.bodyHtml, vars);
-          const subject = renderTemplate(template.subject, vars);
-          await queueEmail({
-            enrollmentId,
-            classId: input.classId,
-            studentId: student!.id,
-            toEmail: input.email,
-            toName: `${input.firstName} ${input.lastName}`,
-            templateKey: "confirmation",
-            subject,
-            bodyHtml,
-            scheduledFor: new Date(),
-          });
-          await updateEnrollment(enrollmentId, { confirmationSentAt: new Date() });
-        }
+        const bodyHtml = buildClassEmailHtml({
+          name: input.firstName,
+          classType: cls.title,
+          date: formatClassDateLong(cls.startDatetime),
+          time: formatClassTime(cls.startDatetime),
+        });
+        await queueEmail({
+          enrollmentId,
+          classId: input.classId,
+          studentId: student!.id,
+          toEmail: input.email,
+          toName: `${input.firstName} ${input.lastName}`,
+          templateKey: "confirmation",
+          subject: `Confirmed: ${cls.title}`,
+          bodyHtml,
+          scheduledFor: new Date(),
+        });
+        await updateEnrollment(enrollmentId, { confirmationSentAt: new Date() });
       }
 
       // Fire push notification to all subscribed staff (non-blocking)
@@ -575,27 +570,23 @@ const enrollmentsRouter = router({
         const student = await getStudentById(enrollment.studentId);
         const destClass = await getClassById(input.toClassId);
         if (student && destClass) {
-          const template = await getEmailTemplate("confirmation");
-          if (template) {
-            const vars = {
-              studentName: `${student.firstName} ${student.lastName}`,
-              className: destClass.title,
-              classDate: formatClassDateLong(destClass.startDatetime),
-              classTime: formatClassTime(destClass.startDatetime),
-              classLocation: destClass.location?.name ?? "TBD",
-            };
-            await queueEmail({
-              enrollmentId: result.newEnrollmentId,
-              classId: input.toClassId,
-              studentId: student.id,
-              toEmail: student.email,
-              toName: `${student.firstName} ${student.lastName}`,
-              templateKey: "confirmation",
-              subject: `Updated: You are confirmed for ${destClass.title}`,
-              bodyHtml: renderTemplate(template.bodyHtml, vars),
-              scheduledFor: new Date(),
-            });
-          }
+          const bodyHtml = buildClassEmailHtml({
+            name: student.firstName,
+            classType: destClass.title,
+            date: formatClassDateLong(destClass.startDatetime),
+            time: formatClassTime(destClass.startDatetime),
+          });
+          await queueEmail({
+            enrollmentId: result.newEnrollmentId,
+            classId: input.toClassId,
+            studentId: student.id,
+            toEmail: student.email,
+            toName: `${student.firstName} ${student.lastName}`,
+            templateKey: "confirmation",
+            subject: `Updated: You are confirmed for ${destClass.title}`,
+            bodyHtml,
+            scheduledFor: new Date(),
+          });
         }
       }
 
@@ -739,10 +730,12 @@ const enrollmentsRouter = router({
       const cls = await getClassById(enrollment.classId!);
       const student = await getStudentById(enrollment.studentId!);
       if (!cls || !student) throw new TRPCError({ code: "NOT_FOUND", message: "Class or student not found" });
-      const settings = await getIntegrationSettings();
-      const classDate = formatClassDateLong(cls.startDatetime);
-      const classTime = formatClassTime(cls.startDatetime);
-      const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Enrollment Confirmation</p></div><div style="padding:24px"><p>Hi ${student.firstName},</p><p>You are confirmed for:</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Questions? Email <a href="mailto:info@r2bear.com">info@r2bear.com</a></p><p>— The Right 2 Bear Team</p></div></div>`;
+      const bodyHtml = buildClassEmailHtml({
+        name: student.firstName,
+        classType: cls.title,
+        date: formatClassDateLong(cls.startDatetime),
+        time: formatClassTime(cls.startDatetime),
+      });
       await queueEmail({ enrollmentId: enrollment.id, classId: cls.id, studentId: student.id, toEmail: student.email, toName: `${student.firstName} ${student.lastName}`, templateKey: "confirmation", subject: `Confirmed: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
       await updateEnrollment(enrollment.id, { confirmationSentAt: new Date() });
       return { success: true };
@@ -757,9 +750,12 @@ const enrollmentsRouter = router({
       const cls = await getClassById(enrollment.classId!);
       const student = await getStudentById(enrollment.studentId!);
       if (!cls || !student) throw new TRPCError({ code: "NOT_FOUND", message: "Class or student not found" });
-      const classDate = formatClassDateLong(cls.startDatetime);
-      const classTime = formatClassTime(cls.startDatetime);
-      const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Class Reminder</p></div><div style="padding:24px"><p>Hi ${student.firstName},</p><p>This is a reminder about your upcoming class:</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Please arrive 10-15 minutes early with a valid photo ID.</p><p>— The Right 2 Bear Team</p></div></div>`;
+      const bodyHtml = buildClassEmailHtml({
+        name: student.firstName,
+        classType: cls.title,
+        date: formatClassDateLong(cls.startDatetime),
+        time: formatClassTime(cls.startDatetime),
+      });
       await queueEmail({ enrollmentId: enrollment.id, classId: cls.id, studentId: student.id, toEmail: student.email, toName: `${student.firstName} ${student.lastName}`, templateKey: "reminder", subject: `Reminder: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
       await updateEnrollment(enrollment.id, { reminderSentAt: new Date() });
       return { success: true };
@@ -776,7 +772,12 @@ const enrollmentsRouter = router({
       const classTime = formatClassTime(cls.startDatetime);
       let count = 0;
       for (const enr of enrollmentList.filter(e => e.status === "enrolled")) {
-        const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Class Reminder</p></div><div style="padding:24px"><p>Hi ${enr.student.firstName},</p><p>Reminder: your class is coming up!</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Please arrive 10-15 minutes early with a valid photo ID.</p><p>— The Right 2 Bear Team</p></div></div>`;
+        const bodyHtml = buildClassEmailHtml({
+          name: enr.student.firstName,
+          classType: cls.title,
+          date: classDate,
+          time: classTime,
+        });
         await queueEmail({ enrollmentId: enr.id, classId: cls.id, studentId: enr.student.id, toEmail: enr.student.email, toName: `${enr.student.firstName} ${enr.student.lastName}`, templateKey: "reminder", subject: `Reminder: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
         count++;
       }
@@ -1326,15 +1327,13 @@ const webhookRouter = router({
         });
 
         // Queue confirmation email
-        const template = await getEmailTemplate("confirmation");
-        if (template) {
-          const vars = {
-            studentName: `${student!.firstName} ${student!.lastName}`,
-            className: matchedClass.title,
-            classDate: formatClassDateLong(matchedClass.startDatetime),
-            classTime: formatClassTime(matchedClass.startDatetime),
-            classLocation: matchedClass.location?.name ?? "TBD",
-          };
+        {
+          const bodyHtml = buildClassEmailHtml({
+            name: student!.firstName,
+            classType: matchedClass.title,
+            date: formatClassDateLong(matchedClass.startDatetime),
+            time: formatClassTime(matchedClass.startDatetime),
+          });
           await queueEmail({
             enrollmentId,
             classId: matchedClass.id,
@@ -1342,8 +1341,8 @@ const webhookRouter = router({
             toEmail: student!.email,
             toName: `${student!.firstName} ${student!.lastName}`,
             templateKey: "confirmation",
-            subject: renderTemplate(template.subject, vars),
-            bodyHtml: renderTemplate(template.bodyHtml, vars),
+            subject: `Confirmed: ${matchedClass.title}`,
+            bodyHtml,
             scheduledFor: new Date(),
           });
         }

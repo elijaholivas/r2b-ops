@@ -20,6 +20,7 @@ import { sendEmailViaMailgun } from "./email";
 import { emailQueue, classes } from "../drizzle/schema";
 import { eq, and, lte, notInArray } from "drizzle-orm";
 import { formatClassDateLong, formatClassTime, formatClassDateMedium } from "./dateUtils";
+import { buildClassEmailHtml } from "./emailTemplates";
 
 // Raw MySQL connection for queries that Drizzle can't run as prepared statements (e.g. parameterized LIMIT)
 async function getRawConn() {
@@ -138,35 +139,12 @@ export async function scheduleReminderEmails(): Promise<void> {
     const existing = existingRows as any[];
     if (existing.length > 0) continue; // Already queued
 
-    const classDate = formatClassDateLong(row.classStartDatetime);
-    const classTime = formatClassTime(row.classStartDatetime);
-
-    const locationLine = [row.locationAddress1, row.locationCity, row.locationState]
-      .filter(Boolean)
-      .join(", ");
-
-    const bodyHtml = `
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-  <div style="background: #1a1a1a; padding: 24px; text-align: center;">
-    <h1 style="color: #c0392b; margin: 0;">Right 2 Bear</h1>
-    <p style="color: #ffffff; margin: 4px 0 0;">Class Reminder</p>
-  </div>
-  <div style="padding: 24px; background: #ffffff;">
-    <p>Hi ${row.studentFirstName},</p>
-    <p>This is a friendly reminder that your class is coming up in <strong>2 days</strong>!</p>
-    <div style="background: #f5f5f5; border-left: 4px solid #c0392b; padding: 16px; margin: 16px 0;">
-      <h2 style="margin: 0 0 8px; color: #1a1a1a;">${row.classTitle}</h2>
-      <p style="margin: 4px 0;"><strong>Date:</strong> ${classDate}</p>
-      <p style="margin: 4px 0;"><strong>Time:</strong> ${classTime}</p>
-      <p style="margin: 4px 0;"><strong>Location:</strong> ${row.locationName}</p>
-      ${locationLine ? `<p style="margin: 4px 0;">${locationLine}</p>` : ""}
-    </div>
-    <p>Please arrive 10–15 minutes early. Bring a valid government-issued photo ID.</p>
-    <p>Questions? Email us at <a href="mailto:info@r2bear.com">info@r2bear.com</a>.</p>
-    <p>See you soon!</p>
-    <p>— The Right 2 Bear Team</p>
-  </div>
-</div>`;
+    const bodyHtml = buildClassEmailHtml({
+      name: row.studentFirstName,
+      classType: row.classTitle,
+      date: formatClassDateLong(row.classStartDatetime),
+      time: formatClassTime(row.classStartDatetime),
+    });
 
     await db.insert(emailQueue).values({
       enrollmentId: row.enrollmentId,

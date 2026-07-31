@@ -261,3 +261,11 @@
 - [x] Fixed 6 spots in routers.ts: enrollment confirmation (add student), move student confirmation, sendConfirmationEmail, sendReminderEmail, sendBulkReminders, WooCommerce webhook confirmation
 - [x] Fixed 2 spots in emailScheduler.ts: 2-day auto-reminder and CCW renewal reminder
 - [x] 26/26 tests passing, 0 TypeScript errors
+
+## V1.29 Features
+- [x] Replace all confirmation and reminder email bodies with new branded R2B template from Google Doc
+- [x] New template includes: location (Randall's Riverside Magnum Range, 12391 Sampson Ave.), check-in time block, SmartWaiver link, full "Please Bring" list, Important Reminders, phone/email contact
+- [x] Dynamic fields: student first name, class type/title, date, time
+- [x] Created server/emailTemplates.ts with buildClassEmailHtml() — single source of truth for all email bodies
+- [x] Applied to all 6 email paths: enrollment add confirmation, move student confirmation, sendConfirmationEmail, sendReminderEmail, sendBulkReminders, WooCommerce webhook confirmation, 2-day auto-reminder
+- [x] 26/26 tests passing, 0 TypeScript errors
