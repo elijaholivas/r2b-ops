@@ -254,3 +254,10 @@
 - [x] SettingsTab UI updated: placeholder domain shows r2bear.com, sender address shows reminder@r2bear.com
 - [x] email.ts: respects defaultFromEmail from DB settings (falls back to reminder@r2bear.com)
 - [x] 26/26 tests passing, 0 TypeScript errors
+
+## V1.28 Features
+- [x] Fix wrong class time in all outgoing emails (same UTC wall-clock bug as V1.18 UI fix)
+- [x] Created server/dateUtils.ts with parseClassDatetime, formatClassDateLong, formatClassTime, formatClassDateMedium
+- [x] Fixed 6 spots in routers.ts: enrollment confirmation (add student), move student confirmation, sendConfirmationEmail, sendReminderEmail, sendBulkReminders, WooCommerce webhook confirmation
+- [x] Fixed 2 spots in emailScheduler.ts: 2-day auto-reminder and CCW renewal reminder
+- [x] 26/26 tests passing, 0 TypeScript errors

@@ -19,6 +19,7 @@ import { getDb, getDueCcwRenewals, markCcwRenewalSent, queueEmail, getIntegratio
 import { sendEmailViaMailgun } from "./email";
 import { emailQueue, classes } from "../drizzle/schema";
 import { eq, and, lte, notInArray } from "drizzle-orm";
+import { formatClassDateLong, formatClassTime, formatClassDateMedium } from "./dateUtils";
 
 // Raw MySQL connection for queries that Drizzle can't run as prepared statements (e.g. parameterized LIMIT)
 async function getRawConn() {
@@ -137,18 +138,8 @@ export async function scheduleReminderEmails(): Promise<void> {
     const existing = existingRows as any[];
     if (existing.length > 0) continue; // Already queued
 
-    const classDate = new Date(row.classStartDatetime).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      timeZone: "America/Los_Angeles",
-    });
-    const classTime = new Date(row.classStartDatetime).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "America/Los_Angeles",
-    });
+    const classDate = formatClassDateLong(row.classStartDatetime);
+    const classTime = formatClassTime(row.classStartDatetime);
 
     const locationLine = [row.locationAddress1, row.locationCity, row.locationState]
       .filter(Boolean)
@@ -213,12 +204,7 @@ export async function scheduleRenewalReminders(): Promise<void> {
 
   for (const item of due) {
     try {
-      const classDate = new Date(item.class.startDatetime).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        timeZone: "UTC",
-      });
+      const classDate = formatClassDateMedium(item.class.startDatetime);
 
       const bodyHtml = `
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

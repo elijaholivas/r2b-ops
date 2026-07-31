@@ -49,6 +49,7 @@ import {
 } from "./db";
 import { renderTemplate, sendEmailViaMailgun } from "./email";
 import { runWooSync } from "./wooSync";
+import { formatClassDateLong, formatClassTime } from "./dateUtils";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 
@@ -489,8 +490,8 @@ const enrollmentsRouter = router({
           const vars = {
             studentName: `${input.firstName} ${input.lastName}`,
             className: cls.title,
-            classDate: new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" }),
-            classTime: new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }),
+            classDate: formatClassDateLong(cls.startDatetime),
+            classTime: formatClassTime(cls.startDatetime),
             classLocation: cls.location?.name ?? "TBD",
           };
           const bodyHtml = renderTemplate(template.bodyHtml, vars);
@@ -579,8 +580,8 @@ const enrollmentsRouter = router({
             const vars = {
               studentName: `${student.firstName} ${student.lastName}`,
               className: destClass.title,
-              classDate: new Date(destClass.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" }),
-              classTime: new Date(destClass.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }),
+              classDate: formatClassDateLong(destClass.startDatetime),
+              classTime: formatClassTime(destClass.startDatetime),
               classLocation: destClass.location?.name ?? "TBD",
             };
             await queueEmail({
@@ -739,8 +740,8 @@ const enrollmentsRouter = router({
       const student = await getStudentById(enrollment.studentId!);
       if (!cls || !student) throw new TRPCError({ code: "NOT_FOUND", message: "Class or student not found" });
       const settings = await getIntegrationSettings();
-      const classDate = new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
-      const classTime = new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+      const classDate = formatClassDateLong(cls.startDatetime);
+      const classTime = formatClassTime(cls.startDatetime);
       const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Enrollment Confirmation</p></div><div style="padding:24px"><p>Hi ${student.firstName},</p><p>You are confirmed for:</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Questions? Email <a href="mailto:info@r2bear.com">info@r2bear.com</a></p><p>— The Right 2 Bear Team</p></div></div>`;
       await queueEmail({ enrollmentId: enrollment.id, classId: cls.id, studentId: student.id, toEmail: student.email, toName: `${student.firstName} ${student.lastName}`, templateKey: "confirmation", subject: `Confirmed: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
       await updateEnrollment(enrollment.id, { confirmationSentAt: new Date() });
@@ -756,8 +757,8 @@ const enrollmentsRouter = router({
       const cls = await getClassById(enrollment.classId!);
       const student = await getStudentById(enrollment.studentId!);
       if (!cls || !student) throw new TRPCError({ code: "NOT_FOUND", message: "Class or student not found" });
-      const classDate = new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
-      const classTime = new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+      const classDate = formatClassDateLong(cls.startDatetime);
+      const classTime = formatClassTime(cls.startDatetime);
       const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Class Reminder</p></div><div style="padding:24px"><p>Hi ${student.firstName},</p><p>This is a reminder about your upcoming class:</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Please arrive 10-15 minutes early with a valid photo ID.</p><p>— The Right 2 Bear Team</p></div></div>`;
       await queueEmail({ enrollmentId: enrollment.id, classId: cls.id, studentId: student.id, toEmail: student.email, toName: `${student.firstName} ${student.lastName}`, templateKey: "reminder", subject: `Reminder: ${cls.title}`, bodyHtml, scheduledFor: new Date() });
       await updateEnrollment(enrollment.id, { reminderSentAt: new Date() });
@@ -771,8 +772,8 @@ const enrollmentsRouter = router({
       const enrollmentList = await getEnrollmentsForClass(input.classId);
       const cls = await getClassById(input.classId);
       if (!cls) throw new TRPCError({ code: "NOT_FOUND", message: "Class not found" });
-      const classDate = new Date(cls.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
-      const classTime = new Date(cls.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+      const classDate = formatClassDateLong(cls.startDatetime);
+      const classTime = formatClassTime(cls.startDatetime);
       let count = 0;
       for (const enr of enrollmentList.filter(e => e.status === "enrolled")) {
         const bodyHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><div style="background:#1a1a1a;padding:24px;text-align:center"><h1 style="color:#c0392b;margin:0">Right 2 Bear</h1><p style="color:#fff;margin:4px 0 0">Class Reminder</p></div><div style="padding:24px"><p>Hi ${enr.student.firstName},</p><p>Reminder: your class is coming up!</p><div style="background:#f5f5f5;border-left:4px solid #c0392b;padding:16px;margin:16px 0"><h2 style="margin:0 0 8px;color:#1a1a1a">${cls.title}</h2><p style="margin:4px 0"><strong>Date:</strong> ${classDate}</p><p style="margin:4px 0"><strong>Time:</strong> ${classTime}</p></div><p>Please arrive 10-15 minutes early with a valid photo ID.</p><p>— The Right 2 Bear Team</p></div></div>`;
@@ -1330,8 +1331,8 @@ const webhookRouter = router({
           const vars = {
             studentName: `${student!.firstName} ${student!.lastName}`,
             className: matchedClass.title,
-            classDate: new Date(matchedClass.startDatetime).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" }),
-            classTime: new Date(matchedClass.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }),
+            classDate: formatClassDateLong(matchedClass.startDatetime),
+            classTime: formatClassTime(matchedClass.startDatetime),
             classLocation: matchedClass.location?.name ?? "TBD",
           };
           await queueEmail({
